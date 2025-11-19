@@ -1,0 +1,127 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    --background: 0 0% 96%;
+    --foreground: 0 0% 20%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 20%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 20%;
+
+    /* Government Blue Primary */
+    --primary: 211 58% 40%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 211 58% 40%;
+
+    --muted: 210 40% 96%;
+    --muted-foreground: 0 0% 45%;
+
+    --accent: 210 40% 94%;
+    --accent-foreground: 211 58% 40%;
+
+    /* Success Green */
+    --success: 123 43% 53%;
+    --success-foreground: 0 0% 100%;
+
+    /* Warning Amber */
+    --warning: 36 100% 50%;
+    --warning-foreground: 0 0% 20%;
+
+    /* Danger Red */
+    --destructive: 4 90% 58%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 211 58% 40%;
+
+    --radius: 0.5rem;
+
+    /* Sidebar specific */
+    --sidebar-background: 211 58% 40%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 0 0% 100%;
+    --sidebar-primary-foreground: 211 58% 40%;
+    --sidebar-accent: 211 58% 35%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 211 58% 35%;
+    --sidebar-ring: 0 0% 100%;
+
+    /* Custom tokens */
+    --stat-card-blue: 211 100% 96%;
+    --stat-card-green: 123 100% 96%;
+    --stat-card-red: 4 100% 96%;
+    --stat-card-amber: 36 100% 96%;
+  }
+
+  .dark {
+    --background: 0 0% 12%;
+    --foreground: 0 0% 95%;
+
+    --card: 0 0% 16%;
+    --card-foreground: 0 0% 95%;
+
+    --popover: 0 0% 16%;
+    --popover-foreground: 0 0% 95%;
+
+    --primary: 211 58% 50%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 0 0% 20%;
+    --secondary-foreground: 0 0% 95%;
+
+    --muted: 0 0% 20%;
+    --muted-foreground: 0 0% 65%;
+
+    --accent: 0 0% 24%;
+    --accent-foreground: 0 0% 95%;
+
+    --success: 123 43% 53%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 36 100% 50%;
+    --warning-foreground: 0 0% 20%;
+
+    --destructive: 4 90% 58%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 24%;
+    --input: 0 0% 24%;
+    --ring: 211 58% 50%;
+
+    --sidebar-background: 0 0% 16%;
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 211 58% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 20%;
+    --sidebar-accent-foreground: 0 0% 95%;
+    --sidebar-border: 0 0% 24%;
+    --sidebar-ring: 211 58% 50%;
+
+    --stat-card-blue: 211 58% 20%;
+    --stat-card-green: 123 43% 20%;
+    --stat-card-red: 4 90% 20%;
+    --stat-card-amber: 36 100% 20%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
