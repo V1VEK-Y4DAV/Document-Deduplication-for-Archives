@@ -30,23 +30,36 @@ export const Sidebar = ({ isOpen }: SidebarProps) => {
         isOpen ? "w-64" : "w-0"
       }`}
     >
-      <nav className="p-4 space-y-1">
-        {menuItems.map((item) => (
+      <nav className="p-4 h-full flex flex-col">
+        <div className="space-y-1 flex-grow">
+          {menuItems.map((item) => (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              className="flex items-center gap-3 px-4 py-3 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
+              activeClassName="bg-sidebar-accent font-medium"
+            >
+              <item.icon className="h-5 w-5 flex-shrink-0" />
+              <span className="text-sm">{item.label}</span>
+              {item.admin && (
+                <span className="ml-auto text-xs bg-sidebar-primary text-sidebar-primary-foreground px-2 py-0.5 rounded">
+                  Admin
+                </span>
+              )}
+            </NavLink>
+          ))}
+        </div>
+        {/* Settings button at the bottom */}
+        <div className="pt-4 border-t border-sidebar-border">
           <NavLink
-            key={item.path}
-            to={item.path}
+            to="/settings"
             className="flex items-center gap-3 px-4 py-3 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
             activeClassName="bg-sidebar-accent font-medium"
           >
-            <item.icon className="h-5 w-5 flex-shrink-0" />
-            <span className="text-sm">{item.label}</span>
-            {item.admin && (
-              <span className="ml-auto text-xs bg-sidebar-primary text-sidebar-primary-foreground px-2 py-0.5 rounded">
-                Admin
-              </span>
-            )}
+            <Settings className="h-5 w-5 flex-shrink-0" />
+            <span className="text-sm">Settings</span>
           </NavLink>
-        ))}
+        </div>
       </nav>
     </aside>
   );
