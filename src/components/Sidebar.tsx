@@ -10,6 +10,7 @@ import {
   LogOut,
   Database,
   Bug,
+  Activity,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -40,6 +41,7 @@ export const Sidebar = ({ isOpen }: SidebarProps) => {
     { icon: FolderOpen, label: "Archive Browser", path: "/browse" },
     { icon: Database, label: "Document Storage", path: "/storage" },
     { icon: Bug, label: "Test Supabase", path: "/test-supabase" },
+    { icon: Activity, label: "Activity Test", path: "/activity-test" },
     { icon: Users, label: "User Management", path: "/admin/users", admin: true },
     { icon: BarChart3, label: "Reports & Analytics", path: "/reports" },
   ];

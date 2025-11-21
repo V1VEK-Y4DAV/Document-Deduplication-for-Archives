@@ -5,6 +5,7 @@ import { Upload as UploadIcon, FileText, Calendar, AlertCircle, CheckCircle, X }
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
 import { documentService, Document } from "@/services/documentService";
+import { deduplicationService, DuplicateResult } from "@/services/deduplicationService";
 import { toast } from "sonner";
 
 interface SelectedFile extends File {
@@ -16,6 +17,7 @@ export default function Upload() {
   const [processed, setProcessed] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
+  const [duplicateResults, setDuplicateResults] = useState<DuplicateResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
 
@@ -69,30 +71,77 @@ export default function Upload() {
     }
 
     setUploading(true);
+    setDuplicateResults(null);
     
     try {
       console.log("Starting upload process for", files.length, "files");
       
-      // Upload each file
-      const uploadPromises = files.map(file => 
-        documentService.uploadDocument({
+      // Upload each file and check for duplicates
+      const results = [];
+      for (const file of files) {
+        // Upload the file
+        const uploadResult = await documentService.uploadDocument({
           file,
           userId: user.id,
           departmentId: undefined
-        })
-      );
-
-      const results = await Promise.all(uploadPromises);
+        });
+        
+        if (uploadResult.success && uploadResult.document) {
+          // Update document with content hash
+          await deduplicationService.updateDocumentHash(
+            uploadResult.document.id,
+            user.id,
+            file
+          );
+          
+          // Check for duplicates
+          const duplicates = await deduplicationService.checkForDuplicates(
+            user.id,
+            file,
+            uploadResult.document.id
+          );
+          
+          results.push({
+            file,
+            document: uploadResult.document,
+            duplicates
+          });
+        } else {
+          results.push({
+            file,
+            error: uploadResult.error
+          });
+        }
+      }
       
       // Check if all uploads were successful
-      const allSuccessful = results.every(result => result.success);
+      const allSuccessful = results.every(result => !result.error);
       
       if (allSuccessful) {
+        // Fix: Show duplicate results from any file that has duplicates, not just the first one
+        // Look for the first file with duplicates, or show results from the first file if none have duplicates
+        let resultsToShow = null;
+        if (results.length > 0) {
+          // Find the first file with actual duplicates
+          const fileWithDuplicates = results.find(result => 
+            result.duplicates && 
+            (result.duplicates.exact.length > 0 || result.duplicates.similar.length > 0)
+          );
+          
+          // If we found a file with duplicates, show those results
+          // Otherwise, show results from the first file
+          resultsToShow = fileWithDuplicates ? fileWithDuplicates.duplicates : results[0].duplicates;
+        }
+        
+        if (resultsToShow) {
+          setDuplicateResults(resultsToShow);
+        }
+        
         setProcessed(true);
         setFiles([]);
-        toast.success(`Successfully uploaded ${files.length} document(s)`);
+        toast.success(`Successfully uploaded ${files.length} document(s) and checked for duplicates`);
       } else {
-        const errors = results.filter(result => !result.success).map(result => result.error);
+        const errors = results.filter(result => result.error).map(result => result.error);
         toast.error(`Some uploads failed: ${errors.join(', ')}`);
       }
     } catch (error) {
@@ -101,17 +150,6 @@ export default function Upload() {
     } finally {
       setUploading(false);
     }
-  };
-
-  const mockResults = {
-    exact: [
-      { name: "budget_2024_copy.pdf", date: "Jan 15, 2024", match: 100 },
-      { name: "policy_duplicate.docx", date: "Dec 10, 2023", match: 100 },
-    ],
-    similar: [
-      { name: "meeting_notes_v2.pdf", date: "Jan 10, 2024", match: 85 },
-      { name: "report_draft.docx", date: "Dec 20, 2023", match: 78 },
-    ],
   };
 
   if (!authChecked) {
@@ -187,7 +225,7 @@ export default function Upload() {
       </Card>
 
       {/* Results Section */}
-      {processed && (
+      {processed && duplicateResults && (
         <>
           {/* Uploaded File Info */}
           <Card className="p-6">
@@ -202,80 +240,97 @@ export default function Upload() {
           </Card>
 
           {/* Exact Duplicates */}
-          <Card className="p-6 border-destructive/50">
-            <div className="flex items-center gap-2 mb-4">
-              <AlertCircle className="h-5 w-5 text-destructive" />
-              <h3 className="text-lg font-semibold text-destructive-foreground">Exact Duplicates Found</h3>
-            </div>
-            <div className="space-y-3">
-              {mockResults.exact.map((file, index) => (
-                <div key={index} className="flex items-center gap-4 p-4 bg-stat-red rounded-lg">
-                  <FileText className="h-6 w-6 text-destructive" />
-                  <div className="flex-1">
-                    <p className="font-medium">{file.name}</p>
-                    <div className="flex items-center gap-3 mt-1">
-                      <span className="text-xs text-muted-foreground flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
-                        {file.date}
-                      </span>
-                      <Badge className="text-xs bg-destructive text-destructive-foreground">
-                        {file.match}% Match
-                      </Badge>
+          {duplicateResults.exact.length > 0 && (
+            <Card className="p-6 border-destructive/50">
+              <div className="flex items-center gap-2 mb-4">
+                <AlertCircle className="h-5 w-5 text-destructive" />
+                <h3 className="text-lg font-semibold text-destructive-foreground">Exact Duplicates Found</h3>
+              </div>
+              <div className="space-y-3">
+                {duplicateResults.exact.map((file, index) => (
+                  <div key={index} className="flex items-center gap-4 p-4 bg-stat-red rounded-lg">
+                    <FileText className="h-6 w-6 text-destructive" />
+                    <div className="flex-1">
+                      <p className="font-medium">{file.file_name}</p>
+                      <div className="flex items-center gap-3 mt-1">
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          {new Date(file.created_at).toLocaleDateString()}
+                        </span>
+                        <Badge className="text-xs bg-destructive text-destructive-foreground">
+                          {file.match_percentage}% Match
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm">
+                        Preview
+                      </Button>
+                      <Button variant="outline" size="sm">
+                        Keep New
+                      </Button>
+                      <Button variant="destructive" size="sm">
+                        Delete New
+                      </Button>
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm">
-                      Preview
-                    </Button>
-                    <Button variant="outline" size="sm">
-                      Keep New
-                    </Button>
-                    <Button variant="destructive" size="sm">
-                      Delete New
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
+                ))}
+              </div>
+            </Card>
+          )}
 
           {/* Similar Documents */}
-          <Card className="p-6 border-warning/50">
-            <div className="flex items-center gap-2 mb-4">
-              <CheckCircle className="h-5 w-5 text-warning" />
-              <h3 className="text-lg font-semibold text-warning-foreground">Similar Documents (Near Duplicates)</h3>
-            </div>
-            <div className="space-y-3">
-              {mockResults.similar.map((file, index) => (
-                <div key={index} className="flex items-center gap-4 p-4 bg-stat-amber rounded-lg">
-                  <FileText className="h-6 w-6 text-warning" />
-                  <div className="flex-1">
-                    <p className="font-medium">{file.name}</p>
-                    <div className="flex items-center gap-3 mt-1">
-                      <span className="text-xs text-muted-foreground flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
-                        {file.date}
-                      </span>
-                      <Badge className="text-xs bg-warning text-warning-foreground">
-                        {file.match}% Match
-                      </Badge>
+          {duplicateResults.similar.length > 0 && (
+            <Card className="p-6 border-warning/50">
+              <div className="flex items-center gap-2 mb-4">
+                <CheckCircle className="h-5 w-5 text-warning" />
+                <h3 className="text-lg font-semibold text-warning-foreground">Similar Documents (Near Duplicates)</h3>
+              </div>
+              <div className="space-y-3">
+                {duplicateResults.similar.map((file, index) => (
+                  <div key={index} className="flex items-center gap-4 p-4 bg-stat-amber rounded-lg">
+                    <FileText className="h-6 w-6 text-warning" />
+                    <div className="flex-1">
+                      <p className="font-medium">{file.file_name}</p>
+                      <div className="flex items-center gap-3 mt-1">
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          {new Date(file.created_at).toLocaleDateString()}
+                        </span>
+                        <Badge className="text-xs bg-warning text-warning-foreground">
+                          {file.similarity_score}% Match
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm">
+                        Preview
+                      </Button>
+                      <Button variant="outline" size="sm">
+                        Merge
+                      </Button>
+                      <Button variant="secondary" size="sm">
+                        Keep Both
+                      </Button>
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm">
-                      Preview
-                    </Button>
-                    <Button variant="outline" size="sm">
-                      Merge
-                    </Button>
-                    <Button variant="secondary" size="sm">
-                      Keep Both
-                    </Button>
-                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
+          {/* No Duplicates Found */}
+          {duplicateResults.exact.length === 0 && duplicateResults.similar.length === 0 && (
+            <Card className="p-6">
+              <div className="flex items-center gap-4 p-4 bg-stat-green rounded-lg">
+                <CheckCircle className="h-8 w-8 text-success" />
+                <div className="flex-1">
+                  <p className="font-medium">No duplicates found</p>
+                  <p className="text-sm text-muted-foreground">Your uploaded documents appear to be unique</p>
                 </div>
-              ))}
-            </div>
-          </Card>
+              </div>
+            </Card>
+          )}
         </>
       )}
     </div>

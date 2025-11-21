@@ -18,6 +18,7 @@ import Reports from "./pages/Reports";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import Settings from "./pages/Settings";
+import ActivityTest from "./pages/ActivityTest";
 
 const queryClient = new QueryClient();
 
@@ -43,6 +44,7 @@ const App = () => (
               <Route path="/browse" element={<Browse />} />
               <Route path="/storage" element={<Storage />} />
               <Route path="/test-supabase" element={<TestSupabase />} />
+              <Route path="/activity-test" element={<ActivityTest />} />
               <Route path="/admin/users" element={<AdminUsers />} />
               <Route path="/admin/settings" element={<AdminSettings />} />
               <Route path="/reports" element={<Reports />} />

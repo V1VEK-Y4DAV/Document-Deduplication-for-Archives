@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { logActivity } from "@/utils/activityLogger";
 
 export interface UploadDocumentParams {
   file: File;
@@ -98,6 +99,20 @@ export const documentService = {
         throw new Error(`Failed to save document record: ${insertError.message}`);
       }
 
+      // Log the activity
+      await logActivity({
+        userId,
+        action: "Document Uploaded",
+        entityType: "document",
+        entityId: documentData.id,
+        details: {
+          fileName: file.name,
+          fileSize: file.size,
+          fileType: file.type || `application/${fileExtension}`,
+          result: "Successfully uploaded document"
+        }
+      });
+
       toast.success("Document uploaded successfully");
       return { success: true, document: documentData as Document };
     } catch (error) {
@@ -118,12 +133,17 @@ export const documentService = {
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase error:", error);
+        throw error;
+      }
+      
       console.log("Fetched documents:", data);
       return data as Document[];
     } catch (error) {
       console.error("Error fetching documents:", error);
       toast.error("Failed to fetch documents");
+      // Return empty array instead of throwing to prevent app crash
       return [];
     }
   },
@@ -132,6 +152,13 @@ export const documentService = {
     try {
       console.log("Deleting document:", documentId, "Storage path:", storagePath);
       
+      // Get document info for logging
+      const { data: documentData, error: fetchError } = await supabase
+        .from('documents')
+        .select('file_name, file_size, user_id, file_type')
+        .eq('id', documentId)
+        .single();
+
       // Delete from storage first
       const { error: storageError } = await supabase.storage
         .from('documents')
@@ -156,6 +183,22 @@ export const documentService = {
       }
       
       console.log("Successfully deleted document record from database");
+
+      // Log the activity
+      if (documentData) {
+        await logActivity({
+          userId: documentData.user_id,
+          action: "Document Deleted",
+          entityType: "document",
+          entityId: documentId,
+          details: {
+            fileName: documentData.file_name,
+            fileSize: documentData.file_size,
+            fileType: documentData.file_type,
+            result: "Successfully deleted document"
+          }
+        });
+      }
 
       toast.success("Document deleted successfully");
       return true;

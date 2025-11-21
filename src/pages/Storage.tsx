@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FileText, Download, Eye, Trash2, Calendar, User } from "lucide-react";
@@ -12,10 +13,15 @@ export default function Storage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (user) {
       fetchDocuments();
+    } else {
+      // If user is not authenticated, stop loading and show error
+      setLoading(false);
+      setError("You must be logged in to view documents");
     }
   }, [user]);
 
@@ -26,7 +32,9 @@ export default function Storage() {
     setError(null);
     
     try {
+      console.log("Fetching documents for user:", user.id);
       const docs = await documentService.getDocuments(user.id);
+      console.log("Documents fetched:", docs);
       setDocuments(docs);
     } catch (err) {
       console.error("Error fetching documents:", err);
@@ -99,6 +107,14 @@ export default function Storage() {
     return "📁";
   };
 
+  const formatDate = (dateString: string) => {
+    try {
+      return format(new Date(dateString), "MMM d, yyyy");
+    } catch (e) {
+      return "Invalid Date";
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -132,7 +148,7 @@ export default function Storage() {
           <FileText className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
           <h3 className="text-lg font-semibold mb-2">No documents found</h3>
           <p className="text-muted-foreground mb-4">Upload your first document to get started</p>
-          <Button onClick={() => window.location.hash = "/upload"}>Upload Document</Button>
+          <Button onClick={() => navigate("/upload")}>Upload Document</Button>
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -146,7 +162,7 @@ export default function Storage() {
                   <h3 className="font-medium truncate">{doc.file_name}</h3>
                   <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
                     <Calendar className="h-3 w-3" />
-                    <span>{format(new Date(doc.created_at), "MMM d, yyyy")}</span>
+                    <span>{formatDate(doc.created_at)}</span>
                   </div>
                   <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
                     <User className="h-3 w-3" />
