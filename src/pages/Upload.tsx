@@ -1,16 +1,79 @@
-import { useState } from "react";
+import { useState, useRef, ChangeEvent } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Upload as UploadIcon, FileText, Calendar, AlertCircle, CheckCircle } from "lucide-react";
+import { Upload as UploadIcon, FileText, Calendar, AlertCircle, CheckCircle, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/contexts/AuthContext";
+import { documentService, Document } from "@/services/documentService";
+import { toast } from "sonner";
+
+interface SelectedFile extends File {
+  id: string;
+}
 
 export default function Upload() {
-  const [files, setFiles] = useState<any[]>([]);
+  const [files, setFiles] = useState<SelectedFile[]>([]);
   const [processed, setProcessed] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { user } = useAuth();
 
-  const handleProcess = () => {
-    // Simulate processing
-    setProcessed(true);
+  const handleFileSelect = (e: ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const newFiles = Array.from(e.target.files).map(file => ({
+        ...file,
+        id: Math.random().toString(36).substring(2, 9)
+      }));
+      setFiles(prev => [...prev, ...newFiles]);
+    }
+  };
+
+  const removeFile = (id: string) => {
+    setFiles(prev => prev.filter(file => file.id !== id));
+  };
+
+  const handleProcess = async () => {
+    if (!user) {
+      toast.error("You must be logged in to upload documents");
+      return;
+    }
+
+    if (files.length === 0) {
+      toast.error("Please select at least one file to upload");
+      return;
+    }
+
+    setUploading(true);
+    
+    try {
+      // Upload each file
+      const uploadPromises = files.map(file => 
+        documentService.uploadDocument({
+          file,
+          userId: user.id,
+          departmentId: undefined
+        })
+      );
+
+      const results = await Promise.all(uploadPromises);
+      
+      // Check if all uploads were successful
+      const allSuccessful = results.every(result => result.success);
+      
+      if (allSuccessful) {
+        setProcessed(true);
+        setFiles([]);
+        toast.success(`Successfully uploaded ${files.length} document(s)`);
+      } else {
+        const errors = results.filter(result => !result.success).map(result => result.error);
+        toast.error(`Some uploads failed: ${errors.join(', ')}`);
+      }
+    } catch (error) {
+      console.error("Upload error:", error);
+      toast.error("Failed to process documents");
+    } finally {
+      setUploading(false);
+    }
   };
 
   const mockResults = {
@@ -33,20 +96,55 @@ export default function Upload() {
 
       {/* Upload Zone */}
       <Card className="p-8">
-        <div className="border-2 border-dashed border-border rounded-lg p-12 text-center hover:border-primary transition-colors cursor-pointer">
+        <div 
+          className="border-2 border-dashed border-border rounded-lg p-12 text-center hover:border-primary transition-colors cursor-pointer"
+          onClick={() => fileInputRef.current?.click()}
+        >
           <UploadIcon className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
           <h3 className="text-lg font-semibold mb-2">Drop your documents here or click to browse</h3>
           <p className="text-sm text-muted-foreground mb-4">Supported formats: PDF, DOCX, DOC, TXT</p>
-          <Button variant="outline" size="lg">
-            Select Files
+          <Button variant="outline" size="lg" disabled={uploading}>
+            {uploading ? "Uploading..." : "Select Files"}
           </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept=".pdf,.docx,.doc,.txt"
+            onChange={handleFileSelect}
+            className="hidden"
+          />
         </div>
 
         {files.length > 0 && (
           <div className="mt-6 space-y-3">
             <div className="flex items-center justify-between">
-              <h4 className="font-semibold">Selected Files</h4>
-              <Button onClick={handleProcess}>Process for Duplicates</Button>
+              <h4 className="font-semibold">Selected Files ({files.length})</h4>
+              <Button onClick={handleProcess} disabled={uploading}>
+                {uploading ? "Processing..." : "Upload Documents"}
+              </Button>
+            </div>
+            
+            <div className="space-y-2">
+              {files.map((file) => (
+                <div key={file.id} className="flex items-center gap-3 p-3 bg-accent rounded-lg">
+                  <FileText className="h-5 w-5 text-primary flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">{file.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {(file.size / 1024 / 1024).toFixed(2)} MB
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => removeFile(file.id)}
+                    className="h-8 w-8"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -57,16 +155,12 @@ export default function Upload() {
         <>
           {/* Uploaded File Info */}
           <Card className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Uploaded File</h3>
+            <h3 className="text-lg font-semibold mb-4">Upload Complete</h3>
             <div className="flex items-center gap-4 p-4 bg-accent rounded-lg">
-              <FileText className="h-8 w-8 text-primary" />
+              <CheckCircle className="h-8 w-8 text-success" />
               <div className="flex-1">
-                <p className="font-medium">new_document.pdf</p>
-                <p className="text-sm text-muted-foreground">File size: 2.4 MB</p>
-              </div>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Calendar className="h-4 w-4" />
-                <span>Uploaded: Just now</span>
+                <p className="font-medium">Documents successfully uploaded</p>
+                <p className="text-sm text-muted-foreground">Your files have been processed and stored</p>
               </div>
             </div>
           </Card>
@@ -75,7 +169,7 @@ export default function Upload() {
           <Card className="p-6 border-destructive/50">
             <div className="flex items-center gap-2 mb-4">
               <AlertCircle className="h-5 w-5 text-destructive" />
-              <h3 className="text-lg font-semibold text-destructive">Exact Duplicates Found</h3>
+              <h3 className="text-lg font-semibold text-destructive-foreground">Exact Duplicates Found</h3>
             </div>
             <div className="space-y-3">
               {mockResults.exact.map((file, index) => (
@@ -88,7 +182,7 @@ export default function Upload() {
                         <Calendar className="h-3 w-3" />
                         {file.date}
                       </span>
-                      <Badge variant="destructive" className="text-xs">
+                      <Badge className="text-xs bg-destructive text-destructive-foreground">
                         {file.match}% Match
                       </Badge>
                     </div>
@@ -136,7 +230,10 @@ export default function Upload() {
                       Preview
                     </Button>
                     <Button variant="outline" size="sm">
-                      View Details
+                      Merge
+                    </Button>
+                    <Button variant="secondary" size="sm">
+                      Keep Both
                     </Button>
                   </div>
                 </div>

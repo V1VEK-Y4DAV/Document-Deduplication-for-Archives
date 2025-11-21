@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Outlet } from "react-router-dom";
-import { Menu, Search, Bell, User, LogOut, ChevronDown } from "lucide-react";
+import { Menu, Search, Bell, User, ChevronDown } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +17,7 @@ import { Sidebar } from "./Sidebar";
 
 export const Layout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
 
   return (
     <div className="min-h-screen flex w-full bg-background">
@@ -79,11 +79,6 @@ export const Layout = () => {
               <DropdownMenuSeparator />
               <DropdownMenuItem>Profile Settings</DropdownMenuItem>
               <DropdownMenuItem>Preferences</DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={signOut} className="text-destructive">
-                <LogOut className="mr-2 h-4 w-4" />
-                Logout
-              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { NavLink } from "@/components/NavLink";
 import {
   LayoutDashboard,
@@ -5,24 +6,45 @@ import {
   Search,
   FolderOpen,
   Users,
-  Settings,
   BarChart3,
+  LogOut,
+  Database,
 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
 
 interface SidebarProps {
   isOpen: boolean;
 }
 
 export const Sidebar = ({ isOpen }: SidebarProps) => {
+  const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false);
+  const { signOut } = useAuth();
+  
   const menuItems = [
     { icon: LayoutDashboard, label: "Dashboard", path: "/" },
     { icon: Upload, label: "Upload Documents", path: "/upload" },
     { icon: Search, label: "Advanced Search", path: "/search" },
     { icon: FolderOpen, label: "Archive Browser", path: "/browse" },
+    { icon: Database, label: "Document Storage", path: "/storage" },
     { icon: Users, label: "User Management", path: "/admin/users", admin: true },
-    { icon: Settings, label: "System Settings", path: "/admin/settings", admin: true },
     { icon: BarChart3, label: "Reports & Analytics", path: "/reports" },
   ];
+
+  const handleLogout = async () => {
+    await signOut();
+  };
 
   return (
     <aside
@@ -49,16 +71,32 @@ export const Sidebar = ({ isOpen }: SidebarProps) => {
             </NavLink>
           ))}
         </div>
-        {/* Settings button at the bottom */}
+        {/* Logout button at the bottom */}
         <div className="pt-4 border-t border-sidebar-border">
-          <NavLink
-            to="/settings"
-            className="flex items-center gap-3 px-4 py-3 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
-            activeClassName="bg-sidebar-accent font-medium"
-          >
-            <Settings className="h-5 w-5 flex-shrink-0" />
-            <span className="text-sm">Settings</span>
-          </NavLink>
+          <AlertDialog open={isLogoutDialogOpen} onOpenChange={setIsLogoutDialogOpen}>
+            <AlertDialogTrigger asChild>
+              <button
+                className="flex items-center gap-3 px-4 py-3 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent transition-colors w-full text-left"
+              >
+                <LogOut className="h-5 w-5 flex-shrink-0" />
+                <span className="text-sm">Logout</span>
+              </button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Confirm Logout</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to logout? You will need to sign in again to access the application.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleLogout} className="bg-destructive hover:bg-destructive/90">
+                  Logout
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </nav>
     </aside>
