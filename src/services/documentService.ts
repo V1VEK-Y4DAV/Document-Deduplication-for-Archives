@@ -130,16 +130,19 @@ export const documentService = {
 
   async deleteDocument(documentId: string, storagePath: string): Promise<boolean> {
     try {
-      console.log("Deleting document:", documentId);
+      console.log("Deleting document:", documentId, "Storage path:", storagePath);
       
-      // Delete from storage
+      // Delete from storage first
       const { error: storageError } = await supabase.storage
         .from('documents')
         .remove([storagePath]);
 
       if (storageError) {
+        console.error("Storage delete error:", storageError);
         throw new Error(`Failed to delete file from storage: ${storageError.message}`);
       }
+      
+      console.log("Successfully deleted file from storage");
 
       // Delete from database
       const { error: dbError } = await supabase
@@ -148,8 +151,11 @@ export const documentService = {
         .eq('id', documentId);
 
       if (dbError) {
+        console.error("Database delete error:", dbError);
         throw new Error(`Failed to delete document record: ${dbError.message}`);
       }
+      
+      console.log("Successfully deleted document record from database");
 
       toast.success("Document deleted successfully");
       return true;

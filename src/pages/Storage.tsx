@@ -80,8 +80,11 @@ export default function Storage() {
     try {
       const success = await documentService.deleteDocument(doc.id, doc.storage_path);
       if (success) {
+        // Update the UI immediately
         setDocuments(prev => prev.filter(d => d.id !== doc.id));
         toast.success("Document deleted successfully");
+      } else {
+        toast.error("Failed to delete document");
       }
     } catch (error) {
       console.error("Delete error:", error);

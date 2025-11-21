@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { StatsCard } from "@/components/StatsCard";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -31,6 +32,7 @@ export default function Dashboard() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -72,6 +74,17 @@ export default function Dashboard() {
 
     fetchData();
   }, [toast]);
+
+  const handleUploadClick = () => {
+    navigate("/upload");
+  };
+
+  const handleQuickScanClick = () => {
+    toast({
+      title: "Quick Archive Scan",
+      description: "This feature is not yet implemented. Please use the Upload page to check for duplicates.",
+    });
+  };
 
   if (loading) {
     return (
@@ -120,11 +133,20 @@ export default function Dashboard() {
           <Card className="p-6">
             <h2 className="text-lg font-semibold text-foreground mb-4">Quick Actions</h2>
             <div className="space-y-3">
-              <Button className="w-full justify-start gap-2" size="lg">
+              <Button 
+                className="w-full justify-start gap-2" 
+                size="lg"
+                onClick={handleUploadClick}
+              >
                 <Upload className="h-5 w-5" />
                 Upload & Check Duplicates
               </Button>
-              <Button variant="secondary" className="w-full justify-start gap-2" size="lg">
+              <Button 
+                variant="secondary" 
+                className="w-full justify-start gap-2" 
+                size="lg"
+                onClick={handleQuickScanClick}
+              >
                 <Search className="h-5 w-5" />
                 Quick Archive Scan
               </Button>
