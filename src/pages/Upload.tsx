@@ -1,4 +1,4 @@
-import { useState, useRef, ChangeEvent } from "react";
+import { useState, useRef, ChangeEvent, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Upload as UploadIcon, FileText, Calendar, AlertCircle, CheckCircle, X } from "lucide-react";
@@ -15,15 +15,26 @@ export default function Upload() {
   const [files, setFiles] = useState<SelectedFile[]>([]);
   const [processed, setProcessed] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
 
+  useEffect(() => {
+    // Check if auth is ready
+    if (user !== undefined) {
+      setAuthChecked(true);
+    }
+  }, [user]);
+
   const handleFileSelect = (e: ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      const newFiles = Array.from(e.target.files).map(file => ({
-        ...file,
-        id: Math.random().toString(36).substring(2, 9)
-      }));
+      const newFiles = Array.from(e.target.files).map(file => {
+        // Create a proper File object with an id property
+        const fileWithId = Object.assign(file, {
+          id: Math.random().toString(36).substring(2, 9)
+        }) as SelectedFile;
+        return fileWithId;
+      });
       setFiles(prev => [...prev, ...newFiles]);
     }
   };
@@ -33,6 +44,11 @@ export default function Upload() {
   };
 
   const handleProcess = async () => {
+    if (!authChecked) {
+      toast.error("Authentication status not ready. Please wait.");
+      return;
+    }
+
     if (!user) {
       toast.error("You must be logged in to upload documents");
       return;
@@ -43,9 +59,20 @@ export default function Upload() {
       return;
     }
 
+    // Check file sizes
+    const maxFileSize = 50 * 1024 * 1024; // 50MB
+    for (const file of files) {
+      if (file.size > maxFileSize) {
+        toast.error(`File ${file.name} is too large. Maximum size is 50MB.`);
+        return;
+      }
+    }
+
     setUploading(true);
     
     try {
+      console.log("Starting upload process for", files.length, "files");
+      
       // Upload each file
       const uploadPromises = files.map(file => 
         documentService.uploadDocument({
@@ -87,6 +114,14 @@ export default function Upload() {
     ],
   };
 
+  if (!authChecked) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
       <div>
@@ -102,8 +137,8 @@ export default function Upload() {
         >
           <UploadIcon className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
           <h3 className="text-lg font-semibold mb-2">Drop your documents here or click to browse</h3>
-          <p className="text-sm text-muted-foreground mb-4">Supported formats: PDF, DOCX, DOC, TXT</p>
-          <Button variant="outline" size="lg" disabled={uploading}>
+          <p className="text-sm text-muted-foreground mb-4">Supported formats: PDF, DOCX, DOC, TXT (Max 50MB each)</p>
+          <Button variant="outline" size="lg" disabled={uploading || !user}>
             {uploading ? "Uploading..." : "Select Files"}
           </Button>
           <input
@@ -120,7 +155,7 @@ export default function Upload() {
           <div className="mt-6 space-y-3">
             <div className="flex items-center justify-between">
               <h4 className="font-semibold">Selected Files ({files.length})</h4>
-              <Button onClick={handleProcess} disabled={uploading}>
+              <Button onClick={handleProcess} disabled={uploading || !user}>
                 {uploading ? "Processing..." : "Upload Documents"}
               </Button>
             </div>
@@ -140,6 +175,7 @@ export default function Upload() {
                     size="icon"
                     onClick={() => removeFile(file.id)}
                     className="h-8 w-8"
+                    disabled={uploading}
                   >
                     <X className="h-4 w-4" />
                   </Button>

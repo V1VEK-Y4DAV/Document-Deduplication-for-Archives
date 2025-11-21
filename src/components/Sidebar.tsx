@@ -9,6 +9,7 @@ import {
   BarChart3,
   LogOut,
   Database,
+  Bug,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -38,6 +39,7 @@ export const Sidebar = ({ isOpen }: SidebarProps) => {
     { icon: Search, label: "Advanced Search", path: "/search" },
     { icon: FolderOpen, label: "Archive Browser", path: "/browse" },
     { icon: Database, label: "Document Storage", path: "/storage" },
+    { icon: Bug, label: "Test Supabase", path: "/test-supabase" },
     { icon: Users, label: "User Management", path: "/admin/users", admin: true },
     { icon: BarChart3, label: "Reports & Analytics", path: "/reports" },
   ];

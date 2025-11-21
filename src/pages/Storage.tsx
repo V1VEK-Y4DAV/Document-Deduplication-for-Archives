@@ -10,6 +10,7 @@ import { toast } from "sonner";
 export default function Storage() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -22,9 +23,18 @@ export default function Storage() {
     if (!user) return;
     
     setLoading(true);
-    const docs = await documentService.getDocuments(user.id);
-    setDocuments(docs);
-    setLoading(false);
+    setError(null);
+    
+    try {
+      const docs = await documentService.getDocuments(user.id);
+      setDocuments(docs);
+    } catch (err) {
+      console.error("Error fetching documents:", err);
+      setError("Failed to load documents. Please try again later.");
+      toast.error("Failed to load documents");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleDownload = async (doc: Document) => {
@@ -59,7 +69,7 @@ export default function Storage() {
       window.open(data.signedUrl, "_blank");
     } catch (error) {
       console.error("View error:", error);
-      toast.error("Failed to view document");
+      toast.error("Failed to view document. The file may not exist or you may not have permission to access it.");
     }
   };
 
@@ -67,10 +77,15 @@ export default function Storage() {
     const confirmed = window.confirm(`Are you sure you want to delete "${doc.file_name}"? This action cannot be undone.`);
     if (!confirmed) return;
 
-    const success = await documentService.deleteDocument(doc.id, doc.storage_path);
-    if (success) {
-      setDocuments(prev => prev.filter(d => d.id !== doc.id));
-      toast.success("Document deleted successfully");
+    try {
+      const success = await documentService.deleteDocument(doc.id, doc.storage_path);
+      if (success) {
+        setDocuments(prev => prev.filter(d => d.id !== doc.id));
+        toast.success("Document deleted successfully");
+      }
+    } catch (error) {
+      console.error("Delete error:", error);
+      toast.error("Failed to delete document");
     }
   };
 
@@ -85,6 +100,19 @@ export default function Storage() {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Card className="p-8 text-center max-w-md">
+          <FileText className="h-16 w-16 mx-auto mb-4 text-destructive" />
+          <h3 className="text-lg font-semibold mb-2">Error Loading Documents</h3>
+          <p className="text-muted-foreground mb-4">{error}</p>
+          <Button onClick={fetchDocuments}>Retry</Button>
+        </Card>
       </div>
     );
   }

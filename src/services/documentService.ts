@@ -22,24 +22,60 @@ export const documentService = {
   
   async uploadDocument({ file, userId, departmentId }: UploadDocumentParams): Promise<{ success: boolean; document?: Document; error?: string }> {
     try {
-      // Create a unique file path
+      console.log("Starting upload process for file:", file.name);
+      
+      // Check if user is authenticated
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error("User not authenticated. Please log in first.");
+      }
+      
+      console.log("User authenticated:", session.user.id);
+      
+      // Validate file
+      if (!file) {
+        throw new Error("No file provided");
+      }
+      
+      // Validate file name
+      if (!file.name || typeof file.name !== 'string') {
+        throw new Error("Invalid file name");
+      }
+      
+      // Validate file size
+      if (typeof file.size !== 'number' || file.size < 0) {
+        throw new Error("Invalid file size");
+      }
+      
+      // Create a unique file path - must match storage policy (user_id/filename)
       const fileExtension = file.name.split('.').pop();
+      if (!fileExtension) {
+        throw new Error("Invalid file type");
+      }
+      
       const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExtension}`;
+      // Fix the file path to match the storage policy: userId/filename
       const filePath = `${userId}/${fileName}`;
+      
+      console.log("File path generated:", filePath);
 
       // Upload file to storage
-      const { error: uploadError } = await supabase.storage
+      console.log("Uploading file to storage...");
+      const { data: uploadData, error: uploadError } = await supabase.storage
         .from('documents')
         .upload(filePath, file, {
           cacheControl: '3600',
           upsert: false
         });
+      
+      console.log("Upload result:", { uploadData, uploadError });
 
       if (uploadError) {
         throw new Error(`Failed to upload file: ${uploadError.message}`);
       }
 
       // Create document record in database
+      console.log("Creating document record in database...");
       const { data: documentData, error: insertError } = await supabase
         .from('documents')
         .insert({
@@ -52,9 +88,12 @@ export const documentService = {
         })
         .select()
         .single();
+      
+      console.log("Database insert result:", { documentData, insertError });
 
       if (insertError) {
         // If database insert fails, try to delete the uploaded file
+        console.log("Cleaning up uploaded file due to database error...");
         await supabase.storage.from('documents').remove([filePath]);
         throw new Error(`Failed to save document record: ${insertError.message}`);
       }
@@ -71,6 +110,8 @@ export const documentService = {
 
   async getDocuments(userId: string): Promise<Document[]> {
     try {
+      console.log("Fetching documents for user:", userId);
+      
       const { data, error } = await supabase
         .from('documents')
         .select('*')
@@ -78,6 +119,7 @@ export const documentService = {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+      console.log("Fetched documents:", data);
       return data as Document[];
     } catch (error) {
       console.error("Error fetching documents:", error);
@@ -88,6 +130,8 @@ export const documentService = {
 
   async deleteDocument(documentId: string, storagePath: string): Promise<boolean> {
     try {
+      console.log("Deleting document:", documentId);
+      
       // Delete from storage
       const { error: storageError } = await supabase.storage
         .from('documents')
