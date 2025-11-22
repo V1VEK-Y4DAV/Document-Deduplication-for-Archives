@@ -10,7 +10,6 @@ import Dashboard from "./pages/Dashboard";
 import Upload from "./pages/Upload";
 import Search from "./pages/Search";
 import Browse from "./pages/Browse";
-import Storage from "./pages/Storage";
 import TestSupabase from "./pages/TestSupabase";
 import AdminUsers from "./pages/AdminUsers";
 import AdminSettings from "./pages/AdminSettings";
@@ -42,7 +41,6 @@ const App = () => (
               <Route path="/upload" element={<Upload />} />
               <Route path="/search" element={<Search />} />
               <Route path="/browse" element={<Browse />} />
-              <Route path="/storage" element={<Storage />} />
               <Route path="/test-supabase" element={<TestSupabase />} />
               <Route path="/activity-test" element={<ActivityTest />} />
               <Route path="/admin/users" element={<AdminUsers />} />

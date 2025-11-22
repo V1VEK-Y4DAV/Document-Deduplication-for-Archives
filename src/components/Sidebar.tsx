@@ -39,7 +39,6 @@ export const Sidebar = ({ isOpen }: SidebarProps) => {
     { icon: Upload, label: "Upload Documents", path: "/upload" },
     { icon: Search, label: "Advanced Search", path: "/search" },
     { icon: FolderOpen, label: "Archive Browser", path: "/browse" },
-    { icon: Database, label: "Document Storage", path: "/storage" },
     { icon: Bug, label: "Test Supabase", path: "/test-supabase" },
     { icon: Activity, label: "Activity Test", path: "/activity-test" },
     { icon: Users, label: "User Management", path: "/admin/users", admin: true },

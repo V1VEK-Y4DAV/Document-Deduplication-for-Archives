@@ -127,6 +127,12 @@ export const documentService = {
     try {
       console.log("Fetching documents for user:", userId);
       
+      // Check if user is authenticated
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error("User not authenticated. Please log in first.");
+      }
+      
       const { data, error } = await supabase
         .from('documents')
         .select('*')
@@ -135,14 +141,15 @@ export const documentService = {
 
       if (error) {
         console.error("Supabase error:", error);
-        throw error;
+        throw new Error(`Database error: ${error.message}`);
       }
       
       console.log("Fetched documents:", data);
       return data as Document[];
     } catch (error) {
       console.error("Error fetching documents:", error);
-      toast.error("Failed to fetch documents");
+      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+      toast.error(`Failed to fetch documents: ${errorMessage}`);
       // Return empty array instead of throwing to prevent app crash
       return [];
     }
