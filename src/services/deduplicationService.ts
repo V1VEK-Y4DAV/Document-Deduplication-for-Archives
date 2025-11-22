@@ -55,15 +55,15 @@ export const deduplicationService = {
         console.error("Error checking exact duplicates:", exactError);
       }
 
-      // For similar documents, we'll simulate a search based on filename similarity
+      // For similar documents, we'll now use content hash similarity instead of filename similarity
       // In a real implementation, you would use NLP techniques to compare content
       const fileName = file.name.toLowerCase();
       const fileNameWithoutExt = fileName.substring(0, fileName.lastIndexOf('.'));
       
-      // Simple similarity check based on filename
+      // NEW: Get documents with similar content hashes for better similarity detection
       const { data: allDocuments, error: allDocsError } = await supabase
         .from("documents")
-        .select("id, file_name, file_size, created_at")
+        .select("id, file_name, file_size, created_at, content_hash")
         .eq("user_id", userId)
         .neq("id", documentId);
 
@@ -71,25 +71,29 @@ export const deduplicationService = {
         console.error("Error fetching documents for similarity check:", allDocsError);
       }
 
-      // Calculate similarity scores (simplified for demo)
+      // Calculate similarity scores based on content hash differences
       const similarDocuments = (allDocuments || []).map(doc => {
-        const docFileName = doc.file_name.toLowerCase();
-        const docFileNameWithoutExt = docFileName.substring(0, docFileName.lastIndexOf('.'));
-        
-        // Simple string similarity (in a real implementation, use proper NLP)
+        // Compare content hashes to determine similarity
+        // The more characters that match in the hash, the more similar the documents
         let similarity = 0;
-        if (fileNameWithoutExt.includes(docFileNameWithoutExt) || 
-            docFileNameWithoutExt.includes(fileNameWithoutExt)) {
-          similarity = 80 + Math.random() * 20; // 80-100% similarity
-        } else if (Math.abs(fileNameWithoutExt.length - docFileNameWithoutExt.length) < 5) {
-          similarity = 60 + Math.random() * 20; // 60-80% similarity
-        } else {
-          similarity = 30 + Math.random() * 30; // 30-60% similarity
+        if (doc.content_hash) {
+          let matchingChars = 0;
+          const hashLength = Math.min(contentHash.length, doc.content_hash.length);
+          
+          // Count matching characters in the hash
+          for (let i = 0; i < hashLength; i++) {
+            if (contentHash[i] === doc.content_hash[i]) {
+              matchingChars++;
+            }
+          }
+          
+          // Convert to percentage (0-100)
+          similarity = Math.round((matchingChars / hashLength) * 100);
         }
         
         return {
           ...doc,
-          similarity_score: Math.round(similarity)
+          similarity_score: similarity
         };
       }).filter(doc => doc.similarity_score >= 70) // Only show documents with 70%+ similarity
         .sort((a, b) => b.similarity_score - a.similarity_score) // Sort by similarity
