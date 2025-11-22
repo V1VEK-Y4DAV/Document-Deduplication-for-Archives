@@ -17,15 +17,66 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { supabase } from "@/integrations/supabase/client";
+import { useState, useEffect } from "react";
+import type { Database } from "@/integrations/supabase/types";
+
+type UserProfile = Database["public"]["Tables"]["profiles"]["Row"] & {
+  role?: string;
+  last_login?: string;
+  status?: string;
+};
 
 export default function AdminUsers() {
-  const users = [
-    { name: "John Doe", email: "john.doe@gov.office", role: "Admin", lastLogin: "2024-01-15 10:30 AM", status: "active" },
-    { name: "Jane Smith", email: "jane.smith@gov.office", role: "Manager", lastLogin: "2024-01-15 09:15 AM", status: "active" },
-    { name: "Bob Johnson", email: "bob.johnson@gov.office", role: "User", lastLogin: "2024-01-14 04:20 PM", status: "active" },
-    { name: "Alice Brown", email: "alice.brown@gov.office", role: "User", lastLogin: "2024-01-13 02:10 PM", status: "active" },
-    { name: "Charlie Davis", email: "charlie.davis@gov.office", role: "Manager", lastLogin: "2024-01-12 11:45 AM", status: "inactive" },
-  ];
+  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch profiles
+      const { data: profiles, error } = await supabase
+        .from("profiles")
+        .select("*");
+      
+      if (error) throw error;
+      
+      // Fetch user roles
+      const { data: userRoles } = await supabase
+        .from("user_roles")
+        .select("*");
+      
+      // Combine profiles with roles
+      const usersWithRoles = profiles.map(profile => {
+        const userRole = userRoles?.find(role => role.user_id === profile.id);
+        return {
+          ...profile,
+          role: userRole?.role || "user",
+          last_login: profile.updated_at ? new Date(profile.updated_at).toLocaleString() : "Never",
+          status: profile.updated_at ? "active" : "inactive"
+        };
+      });
+      
+      setUsers(usersWithRoles);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -67,8 +118,10 @@ export default function AdminUsers() {
           </TableHeader>
           <TableBody>
             {users.map((user, index) => (
-              <TableRow key={index}>
-                <TableCell className="font-medium">{user.name}</TableCell>
+              <TableRow key={user.id || index}>
+                <TableCell className="font-medium">
+                  {user.full_name || user.email}
+                </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">
                     <Mail className="h-4 w-4 text-muted-foreground" />
@@ -77,15 +130,15 @@ export default function AdminUsers() {
                 </TableCell>
                 <TableCell>
                   <Badge
-                    variant={user.role === "Admin" ? "default" : "secondary"}
+                    variant={user.role === "admin" ? "default" : "secondary"}
                     className="gap-1"
                   >
-                    {user.role === "Admin" && <Shield className="h-3 w-3" />}
-                    {user.role}
+                    {user.role === "admin" && <Shield className="h-3 w-3" />}
+                    {user.role?.charAt(0).toUpperCase() + user.role?.slice(1) || "User"}
                   </Badge>
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
-                  {user.lastLogin}
+                  {user.last_login || "Never"}
                 </TableCell>
                 <TableCell>
                   <Badge
@@ -96,7 +149,7 @@ export default function AdminUsers() {
                         : "bg-muted"
                     }
                   >
-                    {user.status}
+                    {user.status || "inactive"}
                   </Badge>
                 </TableCell>
                 <TableCell>
@@ -137,13 +190,13 @@ export default function AdminUsers() {
         <Card className="p-4">
           <p className="text-sm text-muted-foreground mb-1">Admins</p>
           <p className="text-2xl font-bold text-primary">
-            {users.filter((u) => u.role === "Admin").length}
+            {users.filter((u) => u.role === "admin").length}
           </p>
         </Card>
         <Card className="p-4">
           <p className="text-sm text-muted-foreground mb-1">Managers</p>
           <p className="text-2xl font-bold text-primary">
-            {users.filter((u) => u.role === "Manager").length}
+            {users.filter((u) => u.role === "manager").length}
           </p>
         </Card>
       </div>

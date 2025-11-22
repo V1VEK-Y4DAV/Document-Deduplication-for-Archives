@@ -23,7 +23,7 @@ interface DuplicateRateData {
 }
 
 export default function Reports() {
-  const [timePeriod, setTimePeriod] = useState("month");
+  const [timePeriod, setTimePeriod] = useState("3days");
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalDocuments: 0,
@@ -33,7 +33,6 @@ export default function Reports() {
   });
   const [documentTrend, setDocumentTrend] = useState<DocumentTrendData[]>([]);
   const [duplicateRate, setDuplicateRate] = useState<DuplicateRateData[]>([]);
-  const [departmentStats, setDepartmentStats] = useState([]);
 
   useEffect(() => {
     fetchData();
@@ -79,6 +78,9 @@ export default function Reports() {
     let startDate = new Date();
     
     switch (timePeriod) {
+      case "3days":
+        startDate.setDate(now.getDate() - 3);
+        break;
       case "week":
         startDate.setDate(now.getDate() - 7);
         break;
@@ -87,9 +89,6 @@ export default function Reports() {
         break;
       case "quarter":
         startDate.setMonth(now.getMonth() - 3);
-        break;
-      case "year":
-        startDate.setFullYear(now.getFullYear() - 1);
         break;
       default:
         startDate.setMonth(now.getMonth() - 1);
@@ -104,6 +103,9 @@ export default function Reports() {
     let startDate = new Date();
     
     switch (timePeriod) {
+      case "3days":
+        startDate.setDate(now.getDate() - 2); // Last 3 days including today
+        break;
       case "week":
         startDate.setDate(now.getDate() - 6); // Last 7 days including today
         break;
@@ -112,9 +114,6 @@ export default function Reports() {
         break;
       case "quarter":
         startDate.setDate(now.getDate() - 89); // Last 90 days including today
-        break;
-      case "year":
-        startDate.setDate(now.getDate() - 364); // Last 365 days including today
         break;
       default:
         startDate.setDate(now.getDate() - 29); // Default to 30 days
@@ -258,16 +257,7 @@ export default function Reports() {
       setDocumentTrend(documentTrendData);
       setDuplicateRate(duplicateRateData);
       
-      // Mock department stats (in a real app, this would come from the database)
-      const mockDepartmentStats = [
-        { dept: "Finance", docs: 567, duplicates: 89, savings: "2.1 GB" },
-        { dept: "Human Resources", docs: 423, duplicates: 67, savings: "1.5 GB" },
-        { dept: "Administration", docs: 389, duplicates: 54, savings: "1.2 GB" },
-        { dept: "Projects", docs: 312, duplicates: 41, savings: "0.9 GB" },
-        { dept: "IT", docs: 278, duplicates: 38, savings: "0.8 GB" },
-      ];
-      
-      setDepartmentStats(mockDepartmentStats);
+
     } catch (error) {
       console.error("Error fetching reports data:", error);
     } finally {
@@ -298,7 +288,7 @@ export default function Reports() {
             tick={{ fontSize: 12 }}
             tickFormatter={(value) => {
               const date = new Date(value);
-              return timePeriod === "week" || timePeriod === "month" 
+              return timePeriod === "3days" || timePeriod === "week" || timePeriod === "month" 
                 ? date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
                 : date.toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
             }}
@@ -396,10 +386,10 @@ export default function Reports() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="3days">Last 3 days</SelectItem>
               <SelectItem value="week">Last 7 days</SelectItem>
               <SelectItem value="month">Last 30 days</SelectItem>
               <SelectItem value="quarter">Last 3 months</SelectItem>
-              <SelectItem value="year">Last 12 months</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -470,31 +460,7 @@ export default function Reports() {
         </Card>
       </div>
 
-      {/* Department Statistics */}
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Department Activity</h3>
-        <div className="space-y-4">
-          {departmentStats.map((dept, index) => (
-            <div key={index} className="flex items-center gap-4 p-4 bg-accent rounded-lg">
-              <div className="flex-1">
-                <p className="font-medium">{dept.dept}</p>
-              </div>
-              <div className="text-center">
-                <p className="text-sm text-muted-foreground">Documents</p>
-                <p className="font-semibold">{dept.docs}</p>
-              </div>
-              <div className="text-center">
-                <p className="text-sm text-muted-foreground">Duplicates</p>
-                <p className="font-semibold text-destructive">{dept.duplicates}</p>
-              </div>
-              <div className="text-center">
-                <p className="text-sm text-muted-foreground">Saved</p>
-                <p className="font-semibold text-success">{dept.savings}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </Card>
+
     </div>
   );
 }
