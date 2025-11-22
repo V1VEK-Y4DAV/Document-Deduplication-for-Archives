@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { StatsCard } from "@/components/StatsCard";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { FileText, FileCheck, Files, HardDrive, Upload, Search, BarChart3 } from "lucide-react";
+import { FileText, FileCheck, Files, HardDrive, Upload, Search, BarChart3, User, FileUp, FileDown, LogIn, LogOut, Copy } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -242,34 +242,90 @@ export default function Dashboard() {
         <div className="lg:col-span-2">
           <Card className="p-6">
             <h2 className="text-lg font-semibold text-foreground mb-4">Recent Activity</h2>
-            <div className="space-y-4 max-h-[400px] overflow-y-auto">
+            <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
               {activities.length === 0 ? (
                 <p className="text-muted-foreground text-center py-8">No recent activity</p>
               ) : (
-                activities.map((activity) => (
-                  <div
-                    key={activity.id}
-                    className="flex gap-3 pb-4 border-b border-border last:border-0 last:pb-0"
-                  >
-                    <div className="w-2 h-2 mt-2 rounded-full bg-primary flex-shrink-0"></div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-foreground">
-                        {activity.profiles?.full_name || activity.profiles?.email || 'Unknown User'}
-                      </p>
-                      <p className="text-sm text-muted-foreground">{activity.action}</p>
-                      {activity.details && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {activity.details.result || ""}
-                        </p>
-                      )}
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {new Date(activity.created_at).toLocaleString()}
-                      </p>
+                activities.map((activity) => {
+                  // Determine icon based on activity type
+                  let ActivityIcon = User;
+                  let iconBgColor = "bg-primary/10";
+                  let iconColor = "text-primary";
+                  
+                  if (activity.action.includes("Upload")) {
+                    ActivityIcon = FileUp;
+                    iconBgColor = "bg-blue-500/10";
+                    iconColor = "text-blue-500";
+                  } else if (activity.action.includes("Delete")) {
+                    ActivityIcon = FileDown;
+                    iconBgColor = "bg-red-500/10";
+                    iconColor = "text-red-500";
+                  } else if (activity.action.includes("Duplicate")) {
+                    ActivityIcon = Copy;
+                    iconBgColor = "bg-amber-500/10";
+                    iconColor = "text-amber-500";
+                  } else if (activity.action.includes("Login")) {
+                    ActivityIcon = LogIn;
+                    iconBgColor = "bg-green-500/10";
+                    iconColor = "text-green-500";
+                  } else if (activity.action.includes("Logout")) {
+                    ActivityIcon = LogOut;
+                    iconBgColor = "bg-gray-500/10";
+                    iconColor = "text-gray-500";
+                  }
+                  
+                  return (
+                    <div
+                      key={activity.id}
+                      className="flex items-start gap-3 p-3 bg-card rounded-lg border border-border shadow-xs hover:shadow-sm transition-all duration-200"
+                    >
+                      <div className={`flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full ${iconBgColor} ${iconColor}`}>
+                        <ActivityIcon className="w-4 h-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline justify-between gap-2">
+                          <p className="text-sm font-medium text-foreground truncate">
+                            {activity.profiles?.full_name || activity.profiles?.email || 'Unknown User'}
+                          </p>
+                          <p className="text-xs text-muted-foreground whitespace-nowrap">
+                            {new Date(activity.created_at).toLocaleDateString([], { 
+                              month: 'short', 
+                              day: 'numeric'
+                            })} at {new Date(activity.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        </div>
+                        <p className="text-sm text-foreground mt-1">{activity.action}</p>
+                        {activity.details && (
+                          <div className="mt-2 space-y-1">
+                            {activity.details.fileName && (
+                              <p className="text-xs text-muted-foreground bg-secondary/50 px-2 py-1 rounded-md inline-block">
+                                {activity.details.fileName}
+                              </p>
+                            )}
+                            {activity.details.result && (
+                              <p className="text-xs text-muted-foreground">
+                                {activity.details.result}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
+            {activities.length > 0 && (
+              <div className="mt-3 pt-3 border-t border-border">
+                <Button 
+                  variant="outline" 
+                  className="w-full text-sm"
+                  onClick={() => navigate('/activity-test')}
+                >
+                  See More Activities
+                </Button>
+              </div>
+            )}
           </Card>
         </div>
       </div>
