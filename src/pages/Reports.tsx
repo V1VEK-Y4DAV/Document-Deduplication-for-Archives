@@ -25,7 +25,7 @@ interface DuplicateRateData {
 }
 
 export default function Reports() {
-  const [timePeriod, setTimePeriod] = useState("3days");
+  const [timePeriod, setTimePeriod] = useState("week");
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalDocuments: 0,

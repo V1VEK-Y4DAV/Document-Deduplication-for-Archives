@@ -35,11 +35,11 @@ export const Layout = () => {
           </Button>
           <div className="flex items-center gap-2">
             {/* Emblem of India */}
-            <div className="w-8 h-8 flex items-center justify-center">
+            <div className="w-12 h-12 flex items-center justify-center">
               <img 
                 src="https://upload.wikimedia.org/wikipedia/commons/5/55/Emblem_of_India.svg" 
                 alt="Emblem of India" 
-                className="w-8 h-8 object-contain"
+                className="w-12 h-12 object-contain"
               />
             </div>
             <span className="font-semibold text-foreground hidden md:block">
