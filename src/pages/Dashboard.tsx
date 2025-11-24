@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { StatsCard } from "@/components/StatsCard";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { FileText, FileCheck, Files, HardDrive, Upload, Search, BarChart3, User, FileUp, FileDown, LogIn, LogOut, Copy } from "lucide-react";
+import { FileText, FileCheck, Files, HardDrive, Upload, Search, BarChart3, User, FileUp, FileDown, LogIn, LogOut, Copy, TrendingUp, Database, Layers } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -162,10 +162,11 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Header Section */}
       <div>
-        <h1 className="text-3xl font-bold text-foreground mb-2">Dashboard Overview</h1>
-        <p className="text-muted-foreground">Monitor your document deduplication system</p>
+        <h1 className="text-3xl font-bold text-foreground">Dashboard Overview</h1>
+        <p className="text-muted-foreground mt-1">Monitor your document deduplication system</p>
       </div>
 
       {/* Stats Cards */}
@@ -193,58 +194,103 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column - Quick Actions */}
-        <div className="lg:col-span-1">
-          <Card className="p-6">
-            <h2 className="text-lg font-semibold text-foreground mb-4">Quick Actions</h2>
+        <div className="lg:col-span-1 space-y-6">
+          <Card className="p-6 rounded-xl border shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="p-2 rounded-lg bg-primary/10">
+                <TrendingUp className="h-5 w-5 text-primary" />
+              </div>
+              <h2 className="text-lg font-semibold text-foreground">Quick Actions</h2>
+            </div>
             <div className="space-y-3">
               <Button 
-                className="w-full justify-start gap-2" 
+                className="w-full justify-start gap-3 shadow-sm hover:shadow-md transition-shadow rounded-lg py-6" 
                 size="lg"
                 onClick={handleUploadClick}
               >
                 <Upload className="h-5 w-5" />
-                Upload & Check Duplicates
+                <div className="text-left">
+                  <div className="font-medium">Upload & Check Duplicates</div>
+                  <div className="text-xs text-muted-foreground">Add new documents to system</div>
+                </div>
               </Button>
               <Button 
                 variant="secondary" 
-                className="w-full justify-start gap-2" 
+                className="w-full justify-start gap-3 shadow-sm hover:shadow-md transition-shadow rounded-lg py-6" 
                 size="lg"
                 onClick={handleQuickScanClick}
               >
                 <Search className="h-5 w-5" />
-                Quick Archive Scan
+                <div className="text-left">
+                  <div className="font-medium">Quick Archive Scan</div>
+                  <div className="text-xs text-muted-foreground">Scan existing documents</div>
+                </div>
               </Button>
             </div>
           </Card>
 
           {/* Storage Usage */}
-          <Card className="p-6 mt-6">
-            <h2 className="text-lg font-semibold text-foreground mb-4">Storage Usage</h2>
-            <div className="space-y-2">
+          <Card className="p-6 rounded-xl border shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="p-2 rounded-lg bg-primary/10">
+                <Database className="h-5 w-5 text-primary" />
+              </div>
+              <h2 className="text-lg font-semibold text-foreground">Storage Usage</h2>
+            </div>
+            <div className="space-y-4">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Used</span>
                 <span className="font-medium">{stats.storageUsed.toFixed(1)} GB / {stats.storageTotal} GB</span>
               </div>
-              <div className="w-full bg-secondary rounded-full h-2">
+              <div className="w-full bg-secondary rounded-full h-3">
                 <div 
-                  className="bg-primary h-2 rounded-full" 
+                  className="bg-primary h-3 rounded-full transition-all duration-500 ease-out" 
                   style={{ width: `${Math.min(100, Math.round((stats.storageUsed / stats.storageTotal) * 100))}%` }}
                 ></div>
               </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                {stats.storageSaved} saved through deduplication
-              </p>
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>0 GB</span>
+                <span>{stats.storageTotal} GB</span>
+              </div>
+              <div className="pt-2 border-t border-border">
+                <p className="text-sm">
+                  <span className="font-medium text-success">{stats.storageSaved}</span> saved through deduplication
+                </p>
+              </div>
             </div>
           </Card>
         </div>
 
         {/* Right Column - Recent Activity */}
         <div className="lg:col-span-2">
-          <Card className="p-6">
-            <h2 className="text-lg font-semibold text-foreground mb-4">Recent Activity</h2>
-            <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+          <Card className="p-6 rounded-xl border shadow-sm hover:shadow-md transition-shadow h-full">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <Layers className="h-5 w-5 text-primary" />
+                </div>
+                <h2 className="text-lg font-semibold text-foreground">Recent Activity</h2>
+              </div>
+              {activities.length > 0 && (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="text-xs"
+                  onClick={() => navigate('/activity-test')}
+                >
+                  View All
+                </Button>
+              )}
+            </div>
+            <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-rounded-full scrollbar-track-transparent scrollbar-thumb-muted-foreground/20">
               {activities.length === 0 ? (
-                <p className="text-muted-foreground text-center py-8">No recent activity</p>
+                <div className="text-center py-12">
+                  <div className="p-3 rounded-full bg-muted w-12 h-12 flex items-center justify-center mx-auto mb-3">
+                    <Layers className="h-6 w-6 text-muted-foreground" />
+                  </div>
+                  <p className="text-muted-foreground">No recent activity</p>
+                  <p className="text-xs text-muted-foreground mt-1">Actions will appear here when users interact with the system</p>
+                </div>
               ) : (
                 activities.map((activity) => {
                   // Determine icon based on activity type
@@ -277,10 +323,10 @@ export default function Dashboard() {
                   return (
                     <div
                       key={activity.id}
-                      className="flex items-start gap-3 p-3 bg-card rounded-lg border border-border shadow-xs hover:shadow-sm transition-all duration-200"
+                      className="flex items-start gap-3 p-4 bg-card rounded-lg border border-border hover:bg-muted/30 transition-colors duration-200"
                     >
-                      <div className={`flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full ${iconBgColor} ${iconColor}`}>
-                        <ActivityIcon className="w-4 h-4" />
+                      <div className={`flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-full ${iconBgColor} ${iconColor}`}>
+                        <ActivityIcon className="w-5 h-5" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-baseline justify-between gap-2">
@@ -315,39 +361,40 @@ export default function Dashboard() {
                 })
               )}
             </div>
-            {activities.length > 0 && (
-              <div className="mt-3 pt-3 border-t border-border">
-                <Button 
-                  variant="outline" 
-                  className="w-full text-sm"
-                  onClick={() => navigate('/activity-test')}
-                >
-                  See More Activities
-                </Button>
-              </div>
-            )}
           </Card>
         </div>
       </div>
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="p-6">
-          <h2 className="text-lg font-semibold text-foreground mb-4">Monthly Duplicate Trends</h2>
+        <Card className="p-6 rounded-xl border shadow-sm hover:shadow-md transition-shadow">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="p-2 rounded-lg bg-primary/10">
+              <BarChart3 className="h-5 w-5 text-primary" />
+            </div>
+            <h2 className="text-lg font-semibold text-foreground">Monthly Duplicate Trends</h2>
+          </div>
           <div className="h-64 flex items-center justify-center text-muted-foreground">
             <div className="text-center">
               <BarChart3 className="h-12 w-12 mx-auto mb-2 opacity-50" />
-              <p>Chart visualization placeholder</p>
+              <p className="text-sm">Chart visualization placeholder</p>
+              <p className="text-xs text-muted-foreground mt-1">Data visualization coming soon</p>
             </div>
           </div>
         </Card>
 
-        <Card className="p-6">
-          <h2 className="text-lg font-semibold text-foreground mb-4">Document Distribution</h2>
+        <Card className="p-6 rounded-xl border shadow-sm hover:shadow-md transition-shadow">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="p-2 rounded-lg bg-primary/10">
+              <FileText className="h-5 w-5 text-primary" />
+            </div>
+            <h2 className="text-lg font-semibold text-foreground">Document Distribution</h2>
+          </div>
           <div className="h-64 flex items-center justify-center text-muted-foreground">
             <div className="text-center">
               <FileText className="h-12 w-12 mx-auto mb-2 opacity-50" />
-              <p>Chart visualization placeholder</p>
+              <p className="text-sm">Chart visualization placeholder</p>
+              <p className="text-xs text-muted-foreground mt-1">Data visualization coming soon</p>
             </div>
           </div>
         </Card>

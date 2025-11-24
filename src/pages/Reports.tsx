@@ -15,11 +15,13 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 interface DocumentTrendData {
   date: string;
   documents: number;
+  duplicates: number;
 }
 
 interface DuplicateRateData {
   month: string;
   rate: number;
+  documents: number;
 }
 
 export default function Reports() {
@@ -132,30 +134,49 @@ export default function Reports() {
       const dateFilter = getDateFilter();
       
       // Fetch document counts within the selected time period
-      const { data, error } = await supabase
+      const { data: documentsData, error: docsError } = await supabase
         .from("documents")
         .select("created_at")
         .gte("created_at", dateFilter)
         .order("created_at", { ascending: true });
       
-      if (error) throw error;
+      if (docsError) throw docsError;
+      
+      // Fetch duplicate counts within the selected time period
+      const { data: duplicatesData, error: dupError } = await supabase
+        .from("duplicates")
+        .select("created_at")
+        .gte("created_at", dateFilter)
+        .order("created_at", { ascending: true });
+      
+      if (dupError) throw dupError;
       
       // Generate all dates in the range to ensure today's date is included
       const dateRange = generateDateRange();
       const trendData: Record<string, DocumentTrendData> = {};
       
-      // Initialize all dates with 0 documents
+      // Initialize all dates with 0 documents and duplicates
       dateRange.forEach(date => {
-        trendData[date] = { date, documents: 0 };
+        trendData[date] = { date, documents: 0, duplicates: 0 };
       });
       
       // Count documents for each date
-      data.forEach(doc => {
+      documentsData.forEach(doc => {
         const date = new Date(doc.created_at);
         const dateKey = date.toISOString().split('T')[0];
         
         if (trendData[dateKey]) {
           trendData[dateKey].documents += 1;
+        }
+      });
+      
+      // Count duplicates for each date
+      duplicatesData.forEach(dup => {
+        const date = new Date(dup.created_at);
+        const dateKey = date.toISOString().split('T')[0];
+        
+        if (trendData[dateKey]) {
+          trendData[dateKey].duplicates += 1;
         }
       });
       
@@ -168,7 +189,7 @@ export default function Reports() {
       console.error("Error fetching document trend data:", error);
       // Return empty data with today's date to show something
       const today = new Date().toISOString().split('T')[0];
-      return [{ date: today, documents: 0 }];
+      return [{ date: today, documents: 0, duplicates: 0 }];
     }
   };
 
@@ -177,29 +198,50 @@ export default function Reports() {
       const dateFilter = getDateFilter();
       
       // Fetch duplicates within the selected time period
-      const { data, error } = await supabase
+      const { data: duplicatesData, error: dupError } = await supabase
         .from("duplicates")
         .select("created_at")
         .gte("created_at", dateFilter)
         .order("created_at", { ascending: true });
       
-      if (error) throw error;
+      if (dupError) throw dupError;
+      
+      // Fetch documents within the selected time period for comparison
+      const { data: documentsData, error: docsError } = await supabase
+        .from("documents")
+        .select("created_at")
+        .gte("created_at", dateFilter)
+        .order("created_at", { ascending: true });
+      
+      if (docsError) throw docsError;
       
       // If no data, return empty array
-      if (!data || data.length === 0) {
+      if (!duplicatesData || duplicatesData.length === 0) {
         return [];
       }
       
       // Group duplicates by month
       const rateData: Record<string, DuplicateRateData> = {};
-      data.forEach(dup => {
+      duplicatesData.forEach(dup => {
         const date = new Date(dup.created_at);
         const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
         
         if (!rateData[monthKey]) {
-          rateData[monthKey] = { month: monthKey, rate: 0 };
+          rateData[monthKey] = { month: monthKey, rate: 0, documents: 0 };
         }
         rateData[monthKey].rate += 1;
+      });
+      
+      // Count documents per month
+      documentsData.forEach(doc => {
+        const date = new Date(doc.created_at);
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        
+        if (rateData[monthKey]) {
+          rateData[monthKey].documents += 1;
+        } else {
+          rateData[monthKey] = { month: monthKey, rate: 0, documents: 1 };
+        }
       });
       
       // Convert to array and sort by month
@@ -267,7 +309,7 @@ export default function Reports() {
 
   // Chart components with empty state handling
   const DocumentTrendChart = () => {
-    if (documentTrend.length === 0 || documentTrend.every(d => d.documents === 0)) {
+    if (documentTrend.length === 0 || documentTrend.every(d => d.documents === 0 && d.duplicates === 0)) {
       return (
         <div className="flex items-center justify-center h-full">
           <div className="text-center text-muted-foreground">
@@ -295,7 +337,11 @@ export default function Reports() {
           />
           <YAxis tick={{ fontSize: 12 }} />
           <Tooltip 
-            formatter={(value) => [value, 'Documents']}
+            formatter={(value, name) => {
+              if (name === "documents") return [value, 'Documents'];
+              if (name === "duplicates") return [value, 'Duplicates'];
+              return [value, name];
+            }}
             labelFormatter={(value) => `Date: ${value}`}
           />
           <Legend />
@@ -303,6 +349,12 @@ export default function Reports() {
             dataKey="documents" 
             fill="#3b82f6" 
             name="Documents Processed"
+            radius={[4, 4, 0, 0]}
+          />
+          <Bar 
+            dataKey="duplicates" 
+            fill="#f59e0b" 
+            name="Duplicates Found"
             radius={[4, 4, 0, 0]}
           />
         </BarChart>
@@ -325,7 +377,7 @@ export default function Reports() {
     
     return (
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={duplicateRate}>
+        <BarChart data={duplicateRate}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis 
             dataKey="month" 
@@ -338,20 +390,27 @@ export default function Reports() {
           />
           <YAxis tick={{ fontSize: 12 }} />
           <Tooltip 
-            formatter={(value) => [value, 'Duplicates']}
+            formatter={(value, name) => {
+              if (name === "rate") return [value, 'Duplicates'];
+              if (name === "documents") return [value, 'Documents'];
+              return [value, name];
+            }}
             labelFormatter={(value) => `Month: ${value}`}
           />
           <Legend />
-          <Line 
-            type="monotone" 
-            dataKey="rate" 
-            stroke="#10b981" 
-            strokeWidth={2}
-            name="Duplicates Found"
-            dot={{ r: 4 }}
-            activeDot={{ r: 6 }}
+          <Bar 
+            dataKey="documents" 
+            fill="#3b82f6" 
+            name="Documents Processed"
+            radius={[4, 4, 0, 0]}
           />
-        </LineChart>
+          <Bar 
+            dataKey="rate" 
+            fill="#f59e0b" 
+            name="Duplicates Found"
+            radius={[4, 4, 0, 0]}
+          />
+        </BarChart>
       </ResponsiveContainer>
     );
   };

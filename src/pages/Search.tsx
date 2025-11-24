@@ -2,7 +2,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search as SearchIcon, FileText, User, Calendar, Flame, Download, Eye, Loader2 } from "lucide-react";
+import { Search as SearchIcon, FileText, User, Calendar, Flame, Download, Eye, Loader2, Filter, RotateCcw, SortDesc, FolderSearch } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -177,73 +177,102 @@ export default function Search() {
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Header Section */}
       <div>
-        <h1 className="text-3xl font-bold text-foreground mb-2">Advanced Document Search</h1>
-        <p className="text-muted-foreground">Search and filter documents across your archive</p>
+        <h1 className="text-3xl font-bold text-foreground">Advanced Document Search</h1>
+        <p className="text-muted-foreground mt-1">Search and filter documents across your archive</p>
       </div>
 
-      {/* Search Controls */}
-      <Card className="p-6">
-        <div className="space-y-4">
+      {/* Search Controls Card */}
+      <Card className="p-6 rounded-xl border shadow-sm hover:shadow-md transition-shadow">
+        <div className="space-y-6">
           {/* Main Search Bar */}
           <div className="relative">
-            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+              <SearchIcon className="h-5 w-5 text-muted-foreground" />
+            </div>
             <Input
               type="search"
               placeholder="Search documents by name, content, or author..."
-              className="pl-10 h-12 text-lg"
+              className="pl-10 h-12 text-base rounded-lg border-input shadow-sm focus:ring-2 focus:ring-primary/20"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
 
-          {/* Filters Row */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Department: All" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Departments</SelectItem>
-                {departments?.map((dept) => (
-                  <SelectItem key={dept.id} value={dept.id}>
-                    {dept.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          {/* Filters Header */}
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-primary" />
+            <h3 className="text-sm font-medium text-foreground">Filters</h3>
+          </div>
 
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Document Type: All" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="pdf">PDF</SelectItem>
-                <SelectItem value="docx">Word Document</SelectItem>
-                <SelectItem value="txt">Text File</SelectItem>
-              </SelectContent>
-            </Select>
+          {/* Filters Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1 block">Department</Label>
+              <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+                <SelectTrigger className="rounded-lg">
+                  <SelectValue placeholder="All Departments" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Departments</SelectItem>
+                  {departments?.map((dept) => (
+                    <SelectItem key={dept.id} value={dept.id}>
+                      {dept.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-            <Input
-              type="date"
-              placeholder="From"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-            />
-            <Input
-              type="date"
-              placeholder="To"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-            />
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1 block">Document Type</Label>
+              <Select value={typeFilter} onValueChange={setTypeFilter}>
+                <SelectTrigger className="rounded-lg">
+                  <SelectValue placeholder="All Types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="pdf">PDF</SelectItem>
+                  <SelectItem value="docx">Word Document</SelectItem>
+                  <SelectItem value="txt">Text File</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1 block">Date From</Label>
+              <Input
+                type="date"
+                className="rounded-lg"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+              />
+            </div>
+
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1 block">Date To</Label>
+              <Input
+                type="date"
+                className="rounded-lg"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+              />
+            </div>
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2">
             <div className="flex items-center gap-3">
-              <Button variant="outline" onClick={handleReset}>Reset Filters</Button>
+              <Button 
+                variant="outline" 
+                onClick={handleReset}
+                className="gap-2 rounded-lg shadow-sm hover:shadow-md transition-shadow"
+              >
+                <RotateCcw className="h-4 w-4" />
+                Reset Filters
+              </Button>
             </div>
             <div className="flex items-center gap-2">
               <Switch
@@ -251,7 +280,7 @@ export default function Search() {
                 checked={groupBySimilarity}
                 onCheckedChange={setGroupBySimilarity}
               />
-              <Label htmlFor="group-similarity">Group by similarity</Label>
+              <Label htmlFor="group-similarity" className="text-sm">Group by similarity</Label>
             </div>
           </div>
         </div>
@@ -259,46 +288,62 @@ export default function Search() {
 
       {/* Results Section */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            {isLoading ? (
-              <span className="flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Loading...
-              </span>
-            ) : (
-              <>
-                Found <span className="font-semibold text-foreground">{documents?.length || 0}</span> documents
-              </>
-            )}
-          </p>
-          <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="Sort by" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="similarity">Similarity</SelectItem>
-              <SelectItem value="name">Name</SelectItem>
-              <SelectItem value="date">Date</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <FolderSearch className="h-5 w-5 text-primary" />
+            <p className="text-sm text-muted-foreground">
+              {isLoading ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading...
+                </span>
+              ) : (
+                <>
+                  Found <span className="font-semibold text-foreground">{documents?.length || 0}</span> documents
+                </>
+              )}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <SortDesc className="h-4 w-4 text-muted-foreground" />
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="w-48 rounded-lg">
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="similarity">Similarity</SelectItem>
+                <SelectItem value="name">Name</SelectItem>
+                <SelectItem value="date">Date</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <div className="flex items-center justify-center py-16">
+            <div className="text-center">
+              <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-2" />
+              <p className="text-muted-foreground">Searching documents...</p>
+            </div>
           </div>
         ) : groupBySimilarity && processedDocuments ? (
           // Grouped view
-          <div className="space-y-6">
+          <div className="space-y-8">
             {Object.entries(processedDocuments)
               .sort(([a], [b]) => Number(b) - Number(a))
               .map(([group, docs]) => (
-                <div key={group} className="space-y-3">
-                  <h3 className="text-lg font-semibold flex items-center gap-2">
-                    <Flame className="h-5 w-5 text-primary" />
-                    {group}-{Number(group) + 9}% Similarity ({docs.length} documents)
-                  </h3>
+                <div key={group} className="space-y-4">
+                  <div className="flex items-center gap-3 pb-2 border-b border-border">
+                    <div className="p-2 rounded-lg bg-primary/10">
+                      <Flame className="h-5 w-5 text-primary" />
+                    </div>
+                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                      {group}-{Number(group) + 9}% Similarity
+                      <Badge variant="secondary" className="ml-2">
+                        {docs.length} documents
+                      </Badge>
+                    </h3>
+                  </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {docs.map((doc) => (
                       <DocumentCard key={doc.id} doc={doc} onView={handleView} onDownload={handleDownload} />
@@ -309,15 +354,26 @@ export default function Search() {
           </div>
         ) : documents && documents.length > 0 ? (
           // Regular grid view
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {documents.map((doc) => (
               <DocumentCard key={doc.id} doc={doc} onView={handleView} onDownload={handleDownload} />
             ))}
           </div>
         ) : (
-          <div className="text-center py-12 text-muted-foreground">
-            No documents found. Try adjusting your filters.
-          </div>
+          <Card className="p-12 rounded-xl border text-center">
+            <div className="mx-auto w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+              <FolderSearch className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <h3 className="text-lg font-medium text-foreground mb-1">No documents found</h3>
+            <p className="text-muted-foreground mb-4">Try adjusting your filters or search terms</p>
+            <Button 
+              variant="outline" 
+              onClick={handleReset}
+              className="rounded-lg"
+            >
+              Reset Filters
+            </Button>
+          </Card>
         )}
       </div>
     </div>
@@ -335,20 +391,22 @@ function DocumentCard({
   onDownload: (doc: Document) => void;
 }) {
   return (
-    <Card className="p-4 hover:shadow-lg transition-shadow">
-      <div className="space-y-3">
+    <Card className="p-5 rounded-xl border shadow-sm hover:shadow-md transition-all duration-200 hover:border-primary/20">
+      <div className="space-y-4">
         <div className="flex items-start gap-3">
-          <FileText className="h-8 w-8 text-primary flex-shrink-0" />
+          <div className="p-2 rounded-lg bg-primary/10 flex-shrink-0">
+            <FileText className="h-6 w-6 text-primary" />
+          </div>
           <div className="flex-1 min-w-0">
             <h3 className="font-medium text-sm truncate">{doc.file_name}</h3>
-            <div className="flex items-center gap-2 mt-1">
+            <div className="flex flex-wrap items-center gap-2 mt-2">
               {doc.departments && (
-                <Badge variant="outline" className="text-xs">
+                <Badge variant="outline" className="text-xs rounded-full px-2 py-0.5">
                   {doc.departments.name}
                 </Badge>
               )}
               {doc.similarity_score !== null && (
-                <Badge className="text-xs bg-primary/10 text-primary hover:bg-primary/20">
+                <Badge className="text-xs bg-primary/10 text-primary hover:bg-primary/20 rounded-full px-2 py-0.5">
                   <Flame className="h-3 w-3 mr-1" />
                   {doc.similarity_score}%
                 </Badge>
@@ -357,24 +415,34 @@ function DocumentCard({
           </div>
         </div>
 
-        <div className="space-y-1 text-xs text-muted-foreground">
-          <div className="flex items-center gap-1">
-            <User className="h-3 w-3" />
-            <span>Author: {doc.profiles?.full_name || "Unknown"}</span>
+        <div className="space-y-2 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <User className="h-3.5 w-3.5" />
+            <span className="truncate">Author: {doc.profiles?.full_name || "Unknown"}</span>
           </div>
-          <div className="flex items-center gap-1">
-            <Calendar className="h-3 w-3" />
+          <div className="flex items-center gap-2">
+            <Calendar className="h-3.5 w-3.5" />
             <span>Date: {format(new Date(doc.created_at), "MMM dd, yyyy")}</span>
           </div>
         </div>
 
-        <div className="flex gap-2 pt-2">
-          <Button variant="outline" size="sm" className="flex-1" onClick={() => onView(doc)}>
-            <Eye className="h-3 w-3 mr-1" />
+        <div className="flex gap-2 pt-1">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="flex-1 rounded-lg shadow-sm hover:shadow-sm" 
+            onClick={() => onView(doc)}
+          >
+            <Eye className="h-3.5 w-3.5 mr-1" />
             View
           </Button>
-          <Button variant="outline" size="sm" className="flex-1" onClick={() => onDownload(doc)}>
-            <Download className="h-3 w-3 mr-1" />
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="flex-1 rounded-lg shadow-sm hover:shadow-sm" 
+            onClick={() => onDownload(doc)}
+          >
+            <Download className="h-3.5 w-3.5 mr-1" />
             Download
           </Button>
         </div>
