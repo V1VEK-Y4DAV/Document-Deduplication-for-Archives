@@ -467,15 +467,15 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="space-y-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header Section */}
-      <div>
+      <div className="pb-2 border-b border-border/50">
         <h1 className="text-3xl font-bold text-foreground">Dashboard Overview</h1>
-        <p className="text-muted-foreground mt-1">Monitor your document deduplication system</p>
+        <p className="text-muted-foreground mt-2">Monitor your document deduplication system</p>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatsCard
           title="Total Documents"
           value={stats.totalDocuments}
@@ -497,78 +497,81 @@ export default function Dashboard() {
         <StatsCard title="Storage Saved" value={stats.storageSaved} icon={HardDrive} variant="amber" />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left Column - Quick Actions */}
-        <div className="lg:col-span-1 space-y-6">
-          <Card className="p-6 rounded-xl border shadow-sm hover:shadow-md transition-shadow">
+        <div>
+          <Card className="p-6 rounded-xl border shadow-sm hover:shadow-md transition-shadow h-full">
             <div className="flex items-center gap-2 mb-4">
               <div className="p-2 rounded-lg bg-primary/10">
                 <TrendingUp className="h-5 w-5 text-primary" />
               </div>
               <h2 className="text-lg font-semibold text-foreground">Quick Actions</h2>
             </div>
-            <div className="space-y-3">
-              <Button 
-                className="w-full justify-start gap-3 shadow-sm hover:shadow-md transition-shadow rounded-lg py-6" 
-                size="lg"
-                onClick={handleUploadClick}
-              >
-                <Upload className="h-5 w-5" />
-                <div className="text-left">
-                  <div className="font-medium">Upload & Check Duplicates</div>
-                  <div className="text-xs text-muted-foreground">Add new documents to system</div>
-                </div>
-              </Button>
-              <Button 
-                variant="secondary" 
-                className="w-full justify-start gap-3 shadow-sm hover:shadow-md transition-shadow rounded-lg py-6" 
-                size="lg"
-                onClick={handleQuickScanClick}
-              >
-                <Search className="h-5 w-5" />
-                <div className="text-left">
-                  <div className="font-medium">Quick Archive Scan</div>
-                  <div className="text-xs text-muted-foreground">Scan existing documents</div>
-                </div>
-              </Button>
+            <div className="flex flex-col justify-between h-[calc(100%-4rem)]">
+              <div className="space-y-4">
+                <Button 
+                  className="w-full justify-start gap-3 shadow-sm hover:shadow-md transition-shadow rounded-lg py-6" 
+                  size="lg"
+                  onClick={handleUploadClick}
+                >
+                  <Upload className="h-5 w-5" />
+                  <div className="text-left">
+                    <div className="font-medium">Upload & Check Duplicates</div>
+                    <div className="text-xs text-muted-foreground">Add new documents to system</div>
+                  </div>
+                </Button>
+                <Button 
+                  variant="secondary" 
+                  className="w-full justify-start gap-3 shadow-sm hover:shadow-md transition-shadow rounded-lg py-6" 
+                  size="lg"
+                  onClick={handleQuickScanClick}
+                >
+                  <Search className="h-5 w-5" />
+                  <div className="text-left">
+                    <div className="font-medium">Quick Archive Scan</div>
+                    <div className="text-xs text-muted-foreground">Scan existing documents</div>
+                  </div>
+                </Button>
+              </div>
             </div>
           </Card>
+        </div>
 
-          {/* Storage Usage */}
-          <Card className="p-6 rounded-xl border shadow-sm hover:shadow-md transition-shadow">
+        {/* Right Column - Storage Usage */}
+        <div>
+          <Card className="p-6 rounded-xl border shadow-sm hover:shadow-md transition-shadow h-full">
             <div className="flex items-center gap-2 mb-4">
               <div className="p-2 rounded-lg bg-primary/10">
                 <Database className="h-5 w-5 text-primary" />
               </div>
               <h2 className="text-lg font-semibold text-foreground">Storage Usage</h2>
             </div>
-            <div className="space-y-4">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Used</span>
-                <span className="font-medium">{stats.storageUsed.toFixed(1)} GB / {stats.storageTotal} GB</span>
-              </div>
-              <div className="w-full bg-secondary rounded-full h-3">
-                <div 
-                  className="bg-primary h-3 rounded-full transition-all duration-500 ease-out" 
-                  style={{ width: `${Math.min(100, Math.round((stats.storageUsed / stats.storageTotal) * 100))}%` }}
-                ></div>
-              </div>
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>0 GB</span>
-                <span>{stats.storageTotal} GB</span>
-              </div>
-              <div className="pt-2 border-t border-border">
-                <p className="text-sm">
-                  <span className="font-medium text-success">{stats.storageSaved}</span> saved through deduplication
-                </p>
+            <div className="flex flex-col justify-between h-[calc(100%-4rem)]">
+              <div className="space-y-6">
+                <div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Used</span>
+                    <span className="font-medium">{stats.storageUsed.toFixed(1)} GB / {stats.storageTotal} GB</span>
+                  </div>
+                  <div className="w-full bg-secondary rounded-full h-3 mt-2">
+                    <div 
+                      className="bg-primary h-3 rounded-full transition-all duration-500 ease-out" 
+                      style={{ width: `${Math.min(100, Math.round((stats.storageUsed / stats.storageTotal) * 100))}%` }}
+                    ></div>
+                  </div>
+                  <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                    <span>0 GB</span>
+                    <span>{stats.storageTotal} GB</span>
+                  </div>
+                </div>
+                <div className="pt-4 border-t border-border">
+                  <p className="text-sm">
+                    <span className="font-medium text-success">{stats.storageSaved}</span> saved through deduplication
+                  </p>
+                </div>
               </div>
             </div>
           </Card>
-        </div>
-
-        {/* Right Column - Empty */}
-        <div className="lg:col-span-2">
-          <div className="h-full"></div>
         </div>
       </div>
 
