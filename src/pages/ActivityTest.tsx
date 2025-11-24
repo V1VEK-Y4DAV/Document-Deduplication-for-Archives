@@ -83,6 +83,22 @@ export default function ActivityTest() {
     }
   };
 
+  const deleteActivity = async (activityId: string) => {
+    try {
+      const { error } = await supabase
+        .from("activity_logs")
+        .delete()
+        .eq("id", activityId);
+      
+      if (error) throw error;
+      
+      // Refresh the activity list
+      fetchActivities();
+    } catch (error) {
+      console.error("Error deleting activity:", error);
+    }
+  };
+
   return (
     <div className="space-y-6 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header Section */}
@@ -150,9 +166,19 @@ export default function ActivityTest() {
               return (
                 <div 
                   key={activity.id} 
-                  className="p-4 rounded-lg border border-border hover:bg-muted/30 transition-colors duration-200"
+                  className="p-4 rounded-lg border border-border hover:bg-muted/30 transition-colors duration-200 relative"
                 >
-                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                  {/* Delete Button */}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute top-3 right-3 h-7 w-7 rounded-full hover:bg-destructive/10 transition-colors shadow-none text-destructive"
+                    onClick={() => deleteActivity(activity.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                  
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 pr-8">
                     <div className="flex items-start gap-3">
                       <div className={`p-2 rounded-lg ${iconBgColor} mt-0.5`}>
                         <ActivityIconComponent className={`h-4 w-4 ${iconColor}`} />
