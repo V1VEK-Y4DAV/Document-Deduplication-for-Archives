@@ -2,7 +2,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search as SearchIcon, FileText, User, Calendar, Flame, Download, Eye, Loader2, Filter, RotateCcw, SortDesc, FolderSearch } from "lucide-react";
+import { Search as SearchIcon, FileText, User, Calendar, Flame, Download, Eye, Loader2, Filter, RotateCcw, SortDesc, FolderSearch, X } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -43,6 +43,10 @@ export default function Search() {
   const [sortBy, setSortBy] = useState("similarity");
   const [groupBySimilarity, setGroupBySimilarity] = useState(false);
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Check if any filters are active
+  const hasActiveFilters = departmentFilter !== "all" || typeFilter !== "all" || dateFrom || dateTo;
 
   // Debounce search query
   useEffect(() => {
@@ -179,110 +183,189 @@ export default function Search() {
   return (
     <div className="space-y-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header Section */}
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">Advanced Document Search</h1>
-        <p className="text-muted-foreground mt-1">Search and filter documents across your archive</p>
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">Advanced Document Search</h1>
+          <p className="text-muted-foreground mt-1">Search and filter documents across your archive</p>
+        </div>
+        <div className="relative w-full lg:w-[500px]">
+          <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+            <SearchIcon className="h-5 w-5 text-muted-foreground" />
+          </div>
+          <Input
+            type="search"
+            placeholder="Search documents by name, content, or author..."
+            className="pl-12 h-14 text-lg rounded-xl border-2 border-primary shadow-lg focus:ring-4 focus:ring-primary/30 focus:border-primary bg-white"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
       </div>
 
       {/* Search Controls Card */}
       <Card className="p-6 rounded-xl border shadow-sm hover:shadow-md transition-shadow">
         <div className="space-y-6">
-          {/* Main Search Bar */}
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-              <SearchIcon className="h-5 w-5 text-muted-foreground" />
-            </div>
-            <Input
-              type="search"
-              placeholder="Search documents by name, content, or author..."
-              className="pl-10 h-12 text-base rounded-lg border-input shadow-sm focus:ring-2 focus:ring-primary/20"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-
-          {/* Filters Header */}
-          <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-primary" />
-            <h3 className="text-sm font-medium text-foreground">Filters</h3>
-          </div>
-
-          {/* Filters Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div>
-              <Label className="text-xs text-muted-foreground mb-1 block">Department</Label>
-              <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-                <SelectTrigger className="rounded-lg">
-                  <SelectValue placeholder="All Departments" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Departments</SelectItem>
-                  {departments?.map((dept) => (
-                    <SelectItem key={dept.id} value={dept.id}>
-                      {dept.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label className="text-xs text-muted-foreground mb-1 block">Document Type</Label>
-              <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="rounded-lg">
-                  <SelectValue placeholder="All Types" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="pdf">PDF</SelectItem>
-                  <SelectItem value="docx">Word Document</SelectItem>
-                  <SelectItem value="txt">Text File</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label className="text-xs text-muted-foreground mb-1 block">Date From</Label>
-              <Input
-                type="date"
-                className="rounded-lg"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-              />
-            </div>
-
-            <div>
-              <Label className="text-xs text-muted-foreground mb-1 block">Date To</Label>
-              <Input
-                type="date"
-                className="rounded-lg"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-              />
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2">
-            <div className="flex items-center gap-3">
+          {/* Filter Toggle Button */}
+          <div className="flex items-center justify-between">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowFilters(!showFilters)}
+              className="gap-2 rounded-lg"
+            >
+              <Filter className="h-4 w-4" />
+              {showFilters ? "Hide Filters" : "Show Filters"}
+              {hasActiveFilters && (
+                <Badge className="ml-2 bg-primary text-primary-foreground rounded-full text-xs px-2 py-0.5">
+                  {hasActiveFilters ? 1 : 0}
+                </Badge>
+              )}
+            </Button>
+            
+            {hasActiveFilters && (
               <Button 
-                variant="outline" 
+                variant="ghost" 
+                size="sm"
                 onClick={handleReset}
-                className="gap-2 rounded-lg shadow-sm hover:shadow-md transition-shadow"
+                className="gap-1 text-muted-foreground hover:text-foreground"
               >
-                <RotateCcw className="h-4 w-4" />
-                Reset Filters
+                <X className="h-4 w-4" />
+                Clear All
               </Button>
-            </div>
-            <div className="flex items-center gap-2">
-              <Switch
-                id="group-similarity"
-                checked={groupBySimilarity}
-                onCheckedChange={setGroupBySimilarity}
-              />
-              <Label htmlFor="group-similarity" className="text-sm">Group by similarity</Label>
-            </div>
+            )}
           </div>
+
+          {/* Collapsible Filters */}
+          {showFilters && (
+            <div className="space-y-5 pt-2 border-t border-border">
+              {/* Filters Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1 block">Department</Label>
+                  <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+                    <SelectTrigger className="rounded-lg">
+                      <SelectValue placeholder="All Departments" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Departments</SelectItem>
+                      {departments?.map((dept) => (
+                        <SelectItem key={dept.id} value={dept.id}>
+                          {dept.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1 block">Document Type</Label>
+                  <Select value={typeFilter} onValueChange={setTypeFilter}>
+                    <SelectTrigger className="rounded-lg">
+                      <SelectValue placeholder="All Types" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Types</SelectItem>
+                      <SelectItem value="pdf">PDF</SelectItem>
+                      <SelectItem value="docx">Word Document</SelectItem>
+                      <SelectItem value="txt">Text File</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1 block">Date From</Label>
+                  <Input
+                    type="date"
+                    className="rounded-lg"
+                    value={dateFrom}
+                    onChange={(e) => setDateFrom(e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1 block">Date To</Label>
+                  <Input
+                    type="date"
+                    className="rounded-lg"
+                    value={dateTo}
+                    onChange={(e) => setDateTo(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Group by Similarity Switch */}
+              <div className="flex items-center justify-between pt-2">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="group-similarity"
+                    checked={groupBySimilarity}
+                    onCheckedChange={setGroupBySimilarity}
+                  />
+                  <Label htmlFor="group-similarity" className="text-sm">Group by similarity</Label>
+                </div>
+                
+                <Button 
+                  variant="outline" 
+                  onClick={handleReset}
+                  className="gap-2 rounded-lg"
+                  size="sm"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Reset
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Active Filters Display */}
+          {hasActiveFilters && !showFilters && (
+            <div className="flex flex-wrap items-center gap-2 pt-2">
+              <span className="text-sm text-muted-foreground">Active filters:</span>
+              {departmentFilter !== "all" && (
+                <Badge variant="secondary" className="rounded-full px-3 py-1 text-xs">
+                  Department: {departments?.find(d => d.id === departmentFilter)?.name || departmentFilter}
+                  <button 
+                    onClick={() => setDepartmentFilter("all")}
+                    className="ml-1 hover:bg-secondary-foreground/10 rounded-full p-0.5"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              )}
+              {typeFilter !== "all" && (
+                <Badge variant="secondary" className="rounded-full px-3 py-1 text-xs">
+                  Type: {typeFilter.toUpperCase()}
+                  <button 
+                    onClick={() => setTypeFilter("all")}
+                    className="ml-1 hover:bg-secondary-foreground/10 rounded-full p-0.5"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              )}
+              {dateFrom && (
+                <Badge variant="secondary" className="rounded-full px-3 py-1 text-xs">
+                  From: {new Date(dateFrom).toLocaleDateString()}
+                  <button 
+                    onClick={() => setDateFrom("")}
+                    className="ml-1 hover:bg-secondary-foreground/10 rounded-full p-0.5"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              )}
+              {dateTo && (
+                <Badge variant="secondary" className="rounded-full px-3 py-1 text-xs">
+                  To: {new Date(dateTo).toLocaleDateString()}
+                  <button 
+                    onClick={() => setDateTo("")}
+                    className="ml-1 hover:bg-secondary-foreground/10 rounded-full p-0.5"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              )}
+            </div>
+          )}
         </div>
       </Card>
 
