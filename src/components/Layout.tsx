@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useNavigate } from "react-router-dom";
 import { Menu, Search, Bell, User, ChevronDown } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ import { Sidebar } from "./Sidebar";
 export const Layout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   return (
     <div className="min-h-screen flex w-full bg-background">
@@ -82,8 +83,12 @@ export const Layout = () => {
             <DropdownMenuContent align="end" className="w-56 bg-popover">
               <DropdownMenuLabel>My Account</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>Profile Settings</DropdownMenuItem>
-              <DropdownMenuItem>Preferences</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate("/settings")}>
+                              Profile Settings
+                            </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate("/settings")}>
+                              Preferences
+                            </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
