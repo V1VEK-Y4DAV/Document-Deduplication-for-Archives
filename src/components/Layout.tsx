@@ -86,9 +86,7 @@ export const Layout = () => {
               <DropdownMenuItem onClick={() => navigate("/settings")}>
                               Profile Settings
                             </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigate("/settings")}>
-                              Preferences
-                            </DropdownMenuItem>
+              
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
