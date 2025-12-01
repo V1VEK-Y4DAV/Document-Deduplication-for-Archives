@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { Lock, Mail, User, Shield } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function Auth() {
   const [email, setEmail] = useState("");
@@ -17,6 +18,7 @@ export default function Auth() {
   const { signIn, signUp, user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState("signin");
 
   useEffect(() => {
     if (user) {
@@ -117,10 +119,11 @@ export default function Auth() {
           </p>
         </div>
 
-        <Tabs defaultValue="signin" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="signin">Sign In</TabsTrigger>
             <TabsTrigger value="signup">Sign Up</TabsTrigger>
+            <TabsTrigger value="forgot">Forgot Password</TabsTrigger>
           </TabsList>
 
           <TabsContent value="signin">
@@ -160,6 +163,15 @@ export default function Auth() {
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? "Signing in..." : "Sign In"}
               </Button>
+              <div className="text-center mt-2">
+                <button 
+                  type="button"
+                  onClick={() => setActiveTab("forgot")}
+                  className="text-sm text-primary hover:underline"
+                >
+                  Forgot Password?
+                </button>
+              </div>
             </form>
           </TabsContent>
 
@@ -220,6 +232,74 @@ export default function Auth() {
               <p className="text-xs text-muted-foreground text-center">
                 By signing up, you agree to our terms of service and privacy policy
               </p>
+            </form>
+          </TabsContent>
+          
+          <TabsContent value="forgot">
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              if (!email) {
+                toast({
+                  title: "Email required",
+                  description: "Please enter your email address",
+                  variant: "destructive",
+                });
+                return;
+              }
+              
+              setLoading(true);
+              const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                redirectTo: `http://localhost:8080/reset-password`,
+              });
+              
+              if (error) {
+                toast({
+                  title: "Error",
+                  description: error.message,
+                  variant: "destructive",
+                });
+              } else {
+                toast({
+                  title: "Password Reset Email Sent",
+                  description: "Check your email for instructions to reset your password",
+                });
+                // Reset email field
+                setEmail("");
+              }
+              setLoading(false);
+            }} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="forgot-email">Email</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="forgot-email"
+                    type="email"
+                    placeholder="your.email@gov.office"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="pl-9"
+                    disabled={loading}
+                  />
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Enter your email address and we'll send you a link to reset your password.
+                </p>
+              </div>
+              
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? "Sending..." : "Send Reset Link"}
+              </Button>
+              
+              <div className="text-center mt-2">
+                <button 
+                  type="button"
+                  onClick={() => setActiveTab("signin")}
+                  className="text-sm text-primary hover:underline"
+                >
+                  Back to Sign In
+                </button>
+              </div>
             </form>
           </TabsContent>
         </Tabs>
