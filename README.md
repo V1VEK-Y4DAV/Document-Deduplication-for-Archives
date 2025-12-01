@@ -1,8 +1,7 @@
 # Document Deduplication for Archives
+
+The E-Office Deduplication Hub is an intelligent document management platform built with React, TypeScript, and Supabase. It streamlines digital archives by automatically detecting and removing duplicate files through a combination of MD5 hashing for exact matches and NLP-powered cosine similarity for content-based comparisons.
 <!--
-
-A modern, responsive portfolio website built with React, featuring smooth background color transitions and beautiful animations.
-
 ## 🚀 Features
 
 - **Dynamic Background Transitions**: Smooth color changes as you scroll through sections
