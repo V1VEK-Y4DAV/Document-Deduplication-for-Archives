@@ -1,10 +1,8 @@
 import { useState } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
-import { Menu, Search, Bell, User, ChevronDown } from "lucide-react";
+import { Menu, User, ChevronDown } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -51,24 +49,10 @@ export const Layout = () => {
 
         {/* Center Section - Search */}
         <div className="flex-1 max-w-2xl mx-auto">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Search documents..."
-              className="pl-9 bg-accent/50 border-border"
-            />
-          </div>
         </div>
 
         {/* Right Section */}
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" className="relative hover:bg-accent">
-            <Bell className="h-5 w-5" />
-            <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 bg-destructive text-xs">
-              3
-            </Badge>
-          </Button>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
