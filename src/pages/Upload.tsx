@@ -1,19 +1,28 @@
 import { useState, useRef, ChangeEvent, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Upload as UploadIcon, FileText, Calendar, AlertCircle, CheckCircle, X } from "lucide-react";
+import { Upload as UploadIcon, FileText, Calendar, AlertCircle, CheckCircle, X, Eye, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
 import { documentService, Document } from "@/services/documentService";
 import { deduplicationService, DuplicateResult } from "@/services/deduplicationService";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { DuplicateResults } from "@/components/DuplicateResults";
 
 interface SelectedFile extends File {
   id: string;
 }
 
+interface ProcessedFile {
+  file: File;
+  document: Document;
+  duplicates: DuplicateResult;
+}
+
 export default function Upload() {
   const [files, setFiles] = useState<SelectedFile[]>([]);
+  const [processedFiles, setProcessedFiles] = useState<ProcessedFile[]>([]);
   const [processed, setProcessed] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
@@ -72,12 +81,13 @@ export default function Upload() {
 
     setUploading(true);
     setDuplicateResults(null);
+    setProcessedFiles([]);
     
     try {
       console.log("Starting upload process for", files.length, "files");
       
       // Upload each file and check for duplicates
-      const results = [];
+      const results: ProcessedFile[] = [];
       for (const file of files) {
         // Upload the file
         const uploadResult = await documentService.uploadDocument({
@@ -107,15 +117,12 @@ export default function Upload() {
             duplicates
           });
         } else {
-          results.push({
-            file,
-            error: uploadResult.error
-          });
+          toast.error(`Failed to upload ${file.name}: ${uploadResult.error}`);
         }
       }
       
       // Check if all uploads were successful
-      const allSuccessful = results.every(result => !result.error);
+      const allSuccessful = results.length === files.length;
       
       if (allSuccessful) {
         // Fix: Show duplicate results from any file that has duplicates, not just the first one
@@ -137,18 +144,83 @@ export default function Upload() {
           setDuplicateResults(resultsToShow);
         }
         
+        setProcessedFiles(results);
         setProcessed(true);
         setFiles([]);
         toast.success(`Successfully uploaded ${files.length} document(s) and checked for duplicates`);
       } else {
-        const errors = results.filter(result => result.error).map(result => result.error);
-        toast.error(`Some uploads failed: ${errors.join(', ')}`);
+        toast.error(`Some uploads failed. Successfully uploaded ${results.length} out of ${files.length} files.`);
       }
     } catch (error) {
       console.error("Upload error:", error);
       toast.error("Failed to process documents");
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleViewDocument = async (storagePath: string) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from("documents")
+        .createSignedUrl(storagePath, 60);
+      
+      if (error) throw error;
+      
+      window.open(data.signedUrl, "_blank");
+    } catch (error) {
+      console.error("View error:", error);
+      toast.error("Failed to view document");
+    }
+  };
+
+  const handleDeleteDocument = async (documentId: string, fileName: string) => {
+    try {
+      if (!user) return;
+      
+      // Delete the document
+      const { error } = await supabase
+        .from("documents")
+        .delete()
+        .eq("id", documentId)
+        .eq("user_id", user.id);
+
+      if (error) throw error;
+      
+      // Remove from processed files
+      setProcessedFiles(prev => prev.filter(pf => pf.document.id !== documentId));
+      
+      // If this was in the current duplicate results, update those too
+      if (duplicateResults) {
+        const newExact = duplicateResults.exact.filter(f => f.id !== documentId);
+        const newSimilar = duplicateResults.similar.filter(f => f.id !== documentId);
+        
+        setDuplicateResults({
+          exact: newExact,
+          similar: newSimilar
+        });
+      }
+      
+      toast.success(`Document ${fileName} deleted successfully`);
+    } catch (error) {
+      console.error("Delete error:", error);
+      toast.error("Failed to delete document");
+    }
+  };
+
+  const handleDuplicateAction = (action: string, fileId: string, fileName: string) => {
+    switch (action) {
+      case "keep_both":
+        toast.info(`Keeping both versions of ${fileName}`);
+        break;
+      case "merge":
+        toast.info(`Merging documents for ${fileName}`);
+        break;
+      case "delete_duplicate":
+        toast.info(`Would delete duplicate ${fileName}`);
+        break;
+      default:
+        toast.info(`Action ${action} performed on ${fileName}`);
     }
   };
 
@@ -225,111 +297,50 @@ export default function Upload() {
       </Card>
 
       {/* Results Section */}
-      {processed && duplicateResults && (
+      {processed && (
         <>
-          {/* Uploaded File Info */}
+          {/* Uploaded Files Info */}
           <Card className="p-6">
             <h3 className="text-lg font-semibold mb-4">Upload Complete</h3>
-            <div className="flex items-center gap-4 p-4 bg-accent rounded-lg">
-              <CheckCircle className="h-8 w-8 text-success" />
-              <div className="flex-1">
-                <p className="font-medium">Documents successfully uploaded</p>
-                <p className="text-sm text-muted-foreground">Your files have been processed and stored</p>
-              </div>
+            <div className="space-y-3">
+              {processedFiles.map((pf, index) => (
+                <div key={index} className="flex items-center gap-4 p-4 bg-accent rounded-lg">
+                  <FileText className="h-6 w-6 text-primary" />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">{pf.file.name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      Uploaded successfully
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => handleViewDocument(pf.document.storage_path)}
+                    >
+                      <Eye className="h-4 w-4 mr-1" />
+                      View
+                    </Button>
+                    <Button 
+                      variant="destructive" 
+                      size="sm" 
+                      onClick={() => handleDeleteDocument(pf.document.id, pf.file.name)}
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              ))}
             </div>
           </Card>
 
-          {/* Exact Duplicates */}
-          {duplicateResults.exact.length > 0 && (
-            <Card className="p-6 border-destructive/50">
-              <div className="flex items-center gap-2 mb-4">
-                <AlertCircle className="h-5 w-5 text-destructive" />
-                <h3 className="text-lg font-semibold text-destructive-foreground">Exact Duplicates Found</h3>
-              </div>
-              <div className="space-y-3">
-                {duplicateResults.exact.map((file, index) => (
-                  <div key={index} className="flex items-center gap-4 p-4 bg-stat-red rounded-lg">
-                    <FileText className="h-6 w-6 text-destructive" />
-                    <div className="flex-1">
-                      <p className="font-medium">{file.file_name}</p>
-                      <div className="flex items-center gap-3 mt-1">
-                        <span className="text-xs text-muted-foreground flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          {new Date(file.created_at).toLocaleDateString()}
-                        </span>
-                        <Badge className="text-xs bg-destructive text-destructive-foreground">
-                          {file.match_percentage}% Match
-                        </Badge>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm">
-                        Preview
-                      </Button>
-                      <Button variant="outline" size="sm">
-                        Keep New
-                      </Button>
-                      <Button variant="destructive" size="sm">
-                        Delete New
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
-
-          {/* Similar Documents */}
-          {duplicateResults.similar.length > 0 && (
-            <Card className="p-6 border-warning/50">
-              <div className="flex items-center gap-2 mb-4">
-                <CheckCircle className="h-5 w-5 text-warning" />
-                <h3 className="text-lg font-semibold text-warning-foreground">Similar Documents (Near Duplicates)</h3>
-              </div>
-              <div className="space-y-3">
-                {duplicateResults.similar.map((file, index) => (
-                  <div key={index} className="flex items-center gap-4 p-4 bg-stat-amber rounded-lg">
-                    <FileText className="h-6 w-6 text-warning" />
-                    <div className="flex-1">
-                      <p className="font-medium">{file.file_name}</p>
-                      <div className="flex items-center gap-3 mt-1">
-                        <span className="text-xs text-muted-foreground flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          {new Date(file.created_at).toLocaleDateString()}
-                        </span>
-                        <Badge className="text-xs bg-warning text-warning-foreground">
-                          {file.similarity_score}% Match
-                        </Badge>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm">
-                        Preview
-                      </Button>
-                      <Button variant="outline" size="sm">
-                        Merge
-                      </Button>
-                      <Button variant="secondary" size="sm">
-                        Keep Both
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
-
-          {/* No Duplicates Found */}
-          {duplicateResults.exact.length === 0 && duplicateResults.similar.length === 0 && (
-            <Card className="p-6">
-              <div className="flex items-center gap-4 p-4 bg-stat-green rounded-lg">
-                <CheckCircle className="h-8 w-8 text-success" />
-                <div className="flex-1">
-                  <p className="font-medium">No duplicates found</p>
-                  <p className="text-sm text-muted-foreground">Your uploaded documents appear to be unique</p>
-                </div>
-              </div>
-            </Card>
+          {/* Duplicate Results */}
+          {duplicateResults && (
+            <DuplicateResults 
+              duplicates={duplicateResults} 
+              onAction={handleDuplicateAction} 
+            />
           )}
         </>
       )}

@@ -199,5 +199,146 @@ export const deduplicationService = {
       });
       throw error;
     }
+  },
+
+  /**
+   * Get all duplicate documents for a user
+   */
+  getAllDuplicateDocuments: async function(userId: string): Promise<any[]> {
+    try {
+      const { data, error } = await supabase
+        .from('duplicates')
+        .select(`
+          *,
+          source_document:documents!duplicates_source_document_id_fkey (
+            id,
+            file_name,
+            file_size,
+            created_at,
+            file_type,
+            storage_path,
+            profiles:user_id (full_name)
+          ),
+          duplicate_document:documents!duplicates_duplicate_document_id_fkey (
+            id,
+            file_name,
+            file_size,
+            created_at,
+            file_type,
+            storage_path,
+            profiles:user_id (full_name)
+          )
+        `)
+        .or(`source_document.user_id.eq.${userId},duplicate_document.user_id.eq.${userId}`)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error("Error fetching duplicate documents:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Delete a duplicate document entry and the actual document
+   */
+  deleteDuplicateDocuments: async function(sourceDocumentId: string, duplicateDocumentId: string, userId: string): Promise<void> {
+    try {
+      // First, delete the duplicate record from duplicates table
+      const { error: duplicateError } = await supabase
+        .from("duplicates")
+        .delete()
+        .or(`source_document_id.eq.${sourceDocumentId},duplicate_document_id.eq.${duplicateDocumentId}`);
+
+      if (duplicateError) throw duplicateError;
+
+      // Then delete the actual duplicate document
+      const { error: documentError } = await supabase
+        .from("documents")
+        .delete()
+        .eq("id", duplicateDocumentId)
+        .eq("user_id", userId);
+
+      if (documentError) throw documentError;
+      
+      // Log the deletion activity
+      await logActivity({
+        userId,
+        action: "Duplicate Document Deleted",
+        entityType: "document",
+        entityId: duplicateDocumentId,
+        details: {
+          sourceDocumentId,
+          timestamp: new Date().toISOString(),
+          result: "Duplicate document deleted successfully"
+        }
+      });
+    } catch (error) {
+      console.error("Error deleting duplicate documents:", error);
+      
+      // Log the error activity
+      await logActivity({
+        userId,
+        action: "Duplicate Document Deletion Failed",
+        entityType: "document",
+        entityId: duplicateDocumentId,
+        details: {
+          sourceDocumentId,
+          error: error instanceof Error ? error.message : "Unknown error",
+          timestamp: new Date().toISOString(),
+          result: "Duplicate document deletion failed"
+        }
+      });
+      throw error;
+    }
+  },
+
+  /**
+   * Update duplicate status (reviewed/dismissed)
+   */
+  updateDuplicateStatus: async function(duplicateId: string, status: "exact" | "similar" | "reviewed" | "dismissed", userId: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from("duplicates")
+        .update({ 
+          status,
+          reviewed_at: new Date().toISOString(),
+          reviewed_by: userId
+        })
+        .eq("id", duplicateId);
+
+      if (error) throw error;
+      
+      // Log the status update activity
+      await logActivity({
+        userId,
+        action: "Duplicate Status Updated",
+        entityType: "duplicate",
+        entityId: duplicateId,
+        details: {
+          status,
+          timestamp: new Date().toISOString(),
+          result: "Duplicate status updated successfully"
+        }
+      });
+    } catch (error) {
+      console.error("Error updating duplicate status:", error);
+      
+      // Log the error activity
+      await logActivity({
+        userId,
+        action: "Duplicate Status Update Failed",
+        entityType: "duplicate",
+        entityId: duplicateId,
+        details: {
+          status,
+          error: error instanceof Error ? error.message : "Unknown error",
+          timestamp: new Date().toISOString(),
+          result: "Duplicate status update failed"
+        }
+      });
+      throw error;
+    }
   }
 };

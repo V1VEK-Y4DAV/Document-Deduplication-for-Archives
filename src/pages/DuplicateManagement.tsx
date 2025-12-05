@@ -28,6 +28,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import { deduplicationService } from "@/services/deduplicationService";
 
 interface DuplicateDocument {
   id: string;
@@ -81,40 +82,9 @@ export default function DuplicateManagement() {
     try {
       setLoading(true);
       
-      let query = supabase
-        .from("duplicates")
-        .select(`
-          *,
-          source_document:documents!duplicates_source_document_id_fkey (
-            id,
-            file_name,
-            file_size,
-            created_at,
-            file_type,
-            storage_path,
-            profiles:user_id (full_name)
-          ),
-          duplicate_document:documents!duplicates_duplicate_document_id_fkey (
-            id,
-            file_name,
-            file_size,
-            created_at,
-            file_type,
-            storage_path,
-            profiles:user_id (full_name)
-          )
-        `)
-        .order("similarity_percentage", { ascending: false });
-
-      // For non-admin users, only show their duplicates
-      if (user) {
-        query = query.or(`source_document.user_id.eq.${user.id},duplicate_document.user_id.eq.${user.id}`);
-      }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
+      if (!user) return;
       
+      const data = await deduplicationService.getAllDuplicateDocuments(user.id);
       setDuplicates(data || []);
     } catch (error) {
       console.error("Error fetching duplicates:", error);
@@ -187,21 +157,14 @@ export default function DuplicateManagement() {
 
   const handleMarkAsReviewed = async (duplicateId: string) => {
     try {
-      const { error } = await supabase
-        .from("duplicates")
-        .update({ 
-          status: "reviewed",
-          reviewed_at: new Date().toISOString(),
-          reviewed_by: user?.id
-        })
-        .eq("id", duplicateId);
-
-      if (error) throw error;
+      if (!user) return;
+      
+      await deduplicationService.updateDuplicateStatus(duplicateId, "reviewed", user.id);
       
       // Update local state
       setDuplicates(prev => prev.map(dup => 
         dup.id === duplicateId 
-          ? { ...dup, status: "reviewed", reviewed_at: new Date().toISOString(), reviewed_by: user?.id } 
+          ? { ...dup, status: "reviewed", reviewed_at: new Date().toISOString(), reviewed_by: user.id } 
           : dup
       ));
       
@@ -214,12 +177,9 @@ export default function DuplicateManagement() {
 
   const handleDismiss = async (duplicateId: string) => {
     try {
-      const { error } = await supabase
-        .from("duplicates")
-        .update({ status: "dismissed" })
-        .eq("id", duplicateId);
-
-      if (error) throw error;
+      if (!user) return;
+      
+      await deduplicationService.updateDuplicateStatus(duplicateId, "dismissed", user.id);
       
       // Update local state
       setDuplicates(prev => prev.map(dup => 
@@ -233,27 +193,15 @@ export default function DuplicateManagement() {
     }
   };
 
-  const handleDeleteDuplicate = async (documentId: string) => {
+  const handleDeleteDuplicate = async (sourceDocumentId: string, duplicateDocumentId: string) => {
     try {
-      // First, delete the duplicate record from duplicates table
-      const { error: duplicateError } = await supabase
-        .from("duplicates")
-        .delete()
-        .or(`source_document_id.eq.${documentId},duplicate_document_id.eq.${documentId}`);
-
-      if (duplicateError) throw duplicateError;
-
-      // Then delete the actual document
-      const { error: documentError } = await supabase
-        .from("documents")
-        .delete()
-        .eq("id", documentId);
-
-      if (documentError) throw documentError;
+      if (!user) return;
+      
+      await deduplicationService.deleteDuplicateDocuments(sourceDocumentId, duplicateDocumentId, user.id);
       
       // Update local state
       setDuplicates(prev => prev.filter(dup => 
-        dup.source_document.id !== documentId && dup.duplicate_document.id !== documentId
+        dup.source_document.id !== sourceDocumentId && dup.duplicate_document.id !== duplicateDocumentId
       ));
       
       toast.success("Duplicate document deleted");
@@ -296,21 +244,46 @@ export default function DuplicateManagement() {
 
   const handleBulkAction = async (action: "review" | "dismiss" | "delete") => {
     try {
+      if (!user) return;
+      
       const promises = selectedDuplicates.map(id => {
+        const duplicate = filteredDuplicates.find(dup => dup.id === id);
+        if (!duplicate) return Promise.resolve();
+        
         switch (action) {
           case "review":
-            return handleMarkAsReviewed(id);
+            return deduplicationService.updateDuplicateStatus(id, "reviewed", user.id);
           case "dismiss":
-            return handleDismiss(id);
+            return deduplicationService.updateDuplicateStatus(id, "dismissed", user.id);
           case "delete":
-            const duplicate = filteredDuplicates.find(dup => dup.id === id);
-            return duplicate ? handleDeleteDuplicate(duplicate.duplicate_document.id) : Promise.resolve();
+            return deduplicationService.deleteDuplicateDocuments(
+              duplicate.source_document.id, 
+              duplicate.duplicate_document.id, 
+              user.id
+            );
           default:
             return Promise.resolve();
         }
       });
       
       await Promise.all(promises);
+      
+      // Update local state
+      if (action === "delete") {
+        setDuplicates(prev => prev.filter(dup => !selectedDuplicates.includes(dup.id)));
+      } else {
+        setDuplicates(prev => prev.map(dup => {
+          if (selectedDuplicates.includes(dup.id)) {
+            return {
+              ...dup,
+              status: action === "review" ? "reviewed" : "dismissed",
+              reviewed_at: action === "review" ? new Date().toISOString() : dup.reviewed_at,
+              reviewed_by: action === "review" ? user.id : dup.reviewed_by
+            };
+          }
+          return dup;
+        }));
+      }
       
       setSelectedDuplicates([]);
       toast.success(`Bulk ${action} completed`);
@@ -597,7 +570,7 @@ export default function DuplicateManagement() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleDeleteDuplicate(duplicate.duplicate_document.id)}
+                      onClick={() => handleDeleteDuplicate(duplicate.source_document.id, duplicate.duplicate_document.id)}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
