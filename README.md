@@ -1,6 +1,11 @@
 # Document Deduplication for Archives
 ##### link - [https://document-deduplication-for-archives.vercel.app/](https://document-deduplication-for-archives.vercel.app/)
 The E-Office Deduplication Hub is an intelligent document management platform built with React, TypeScript, and Supabase. It streamlines digital archives by automatically detecting and removing duplicate files through a combination of MD5 hashing for exact matches and NLP-powered cosine similarity for content-based comparisons.
+
+---
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
 <!--
 ## 🚀 Features
 
