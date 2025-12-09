@@ -48,6 +48,10 @@ export default function Upload() {
       });
       setFiles(prev => [...prev, ...newFiles]);
     }
+    // Reset the input value to allow selecting the same file again
+    if (e.target) {
+      e.target.value = "";
+    }
   };
 
   const removeFile = (id: string) => {
@@ -208,7 +212,9 @@ export default function Upload() {
     }
   };
 
-  const handleDuplicateAction = (action: string, fileId: string, fileName: string) => {
+  const handleDuplicateAction = async (action: string, fileId: string, fileName: string) => {
+    if (!user) return;
+    
     switch (action) {
       case "keep_both":
         toast.info(`Keeping both versions of ${fileName}`);
@@ -217,11 +223,80 @@ export default function Upload() {
         toast.info(`Merging documents for ${fileName}`);
         break;
       case "delete_duplicate":
-        toast.info(`Would delete duplicate ${fileName}`);
+        try {
+          // Get the current document's hash
+          const { data: currentDoc, error: docError } = await supabase
+            .from("documents")
+            .select("content_hash, file_name")
+            .eq("id", fileId)
+            .single();
+          
+          if (docError) throw docError;
+          
+          // Find the processed file that contains this duplicate
+          const processedFile = processedFiles.find(pf => 
+            pf.duplicates.exact.some(d => d.id === fileId) || 
+            pf.duplicates.similar.some(d => d.id === fileId)
+          );
+          
+          if (processedFile && currentDoc.content_hash) {
+            // Get the source document (the one we just uploaded)
+            const sourceDoc = processedFile.document;
+            
+            if (sourceDoc.content_hash) {
+              // Store in deleted duplicates memory
+              const { error: memoryError } = await supabase
+                .from("deleted_duplicates_memory")
+                .insert({
+                  user_id: user.id,
+                  source_content_hash: sourceDoc.content_hash,
+                  duplicate_content_hash: currentDoc.content_hash,
+                  source_file_name: sourceDoc.file_name,
+                  duplicate_file_name: currentDoc.file_name,
+                  notes: "Deleted during upload duplicate check"
+                });
+              
+              if (memoryError) {
+                console.error("Error storing deleted duplicate memory:", memoryError);
+              }
+            }
+          }
+          
+          // Delete the duplicate document
+          const { error } = await supabase
+            .from("documents")
+            .delete()
+            .eq("id", fileId)
+            .eq("user_id", user.id);
+          
+          if (error) throw error;
+          
+          // Update UI to remove the deleted duplicate
+          if (duplicateResults) {
+            const newExact = duplicateResults.exact.filter(f => f.id !== fileId);
+            const newSimilar = duplicateResults.similar.filter(f => f.id !== fileId);
+            
+            setDuplicateResults({
+              exact: newExact,
+              similar: newSimilar
+            });
+          }
+          
+          toast.success(`Duplicate ${fileName} deleted successfully`);
+        } catch (error) {
+          console.error("Delete duplicate error:", error);
+          toast.error("Failed to delete duplicate document");
+        }
         break;
       default:
         toast.info(`Action ${action} performed on ${fileName}`);
     }
+  };
+
+  const handleUploadMore = () => {
+    setProcessed(false);
+    setDuplicateResults(null);
+    setProcessedFiles([]);
   };
 
   if (!authChecked) {
@@ -301,7 +376,12 @@ export default function Upload() {
         <>
           {/* Uploaded Files Info */}
           <Card className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Upload Complete</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Upload Complete</h3>
+              <Button onClick={handleUploadMore} variant="outline">
+                Upload More Documents
+              </Button>
+            </div>
             <div className="space-y-3">
               {processedFiles.map((pf, index) => (
                 <div key={index} className="flex items-center gap-4 p-4 bg-accent rounded-lg">

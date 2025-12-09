@@ -20,6 +20,7 @@ import Settings from "./pages/Settings";
 import ActivityTest from "./pages/ActivityTest";
 import ResetPassword from "./pages/ResetPassword";
 import DuplicateManagement from "./pages/DuplicateManagement";
+import TestDuplicateQuery from "./pages/TestDuplicateQuery";
 
 const queryClient = new QueryClient();
 
@@ -51,6 +52,7 @@ const App = () => (
               <Route path="/reports" element={<Reports />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/duplicate-management" element={<DuplicateManagement />} />
+              <Route path="/test-duplicate-query" element={<TestDuplicateQuery />} />
             </Route>
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

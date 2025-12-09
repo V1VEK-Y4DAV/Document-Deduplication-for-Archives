@@ -52,6 +52,47 @@ export type Database = {
           },
         ]
       }
+      deleted_duplicates_memory: {
+        Row: {
+          deleted_at: string | null
+          duplicate_content_hash: string
+          duplicate_file_name: string
+          id: string
+          notes: string | null
+          source_content_hash: string
+          source_file_name: string
+          user_id: string
+        }
+        Insert: {
+          deleted_at?: string | null
+          duplicate_content_hash: string
+          duplicate_file_name: string
+          id?: string
+          notes?: string | null
+          source_content_hash: string
+          source_file_name: string
+          user_id: string
+        }
+        Update: {
+          deleted_at?: string | null
+          duplicate_content_hash?: string
+          duplicate_file_name?: string
+          id?: string
+          notes?: string | null
+          source_content_hash?: string
+          source_file_name?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deleted_duplicates_memory_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       departments: {
         Row: {
           created_at: string | null

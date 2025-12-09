@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +29,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { deduplicationService } from "@/services/deduplicationService";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 interface DuplicateDocument {
   id: string;
@@ -62,39 +63,53 @@ interface DuplicateDocument {
 }
 
 export default function DuplicateManagement() {
-  const { user } = useAuth();
-  const [duplicates, setDuplicates] = useState<DuplicateDocument[]>([]);
-  const [filteredDuplicates, setFilteredDuplicates] = useState<DuplicateDocument[]>([]);
-  const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortBy, setSortBy] = useState("similarity");
   const [selectedDuplicates, setSelectedDuplicates] = useState<string[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    fetchDuplicates();
-  }, []);
-
-  useEffect(() => {
-    filterAndSortDuplicates();
-  }, [duplicates, statusFilter, sortBy]);
-
-  const fetchDuplicates = async () => {
-    try {
-      setLoading(true);
+  // Fetch duplicate documents with pagination
+  const { data, isLoading, isError, error, refetch } = useQuery({
+    queryKey: ['duplicateDocuments', user?.id, currentPage, itemsPerPage],
+    queryFn: async () => {
+      if (!user) throw new Error("User not authenticated");
       
-      if (!user) return;
+      console.log("Fetching duplicates for user:", user.id);
       
-      const data = await deduplicationService.getAllDuplicateDocuments(user.id);
-      setDuplicates(data || []);
-    } catch (error) {
-      console.error("Error fetching duplicates:", error);
-      toast.error("Failed to load duplicates");
-    } finally {
-      setLoading(false);
-    }
-  };
+      try {
+        const data = await deduplicationService.getAllDuplicateDocuments(
+          user.id, 
+          currentPage, 
+          itemsPerPage
+        );
+        
+        console.log("Received data:", data);
+        
+        // Fetch deleted duplicates count
+        const count = await deduplicationService.getDeletedDuplicatesCount(user.id);
+        
+        return {
+          duplicates: data,
+          deletedDuplicatesCount: count
+        };
+      } catch (err) {
+        console.error("Error in queryFn:", err);
+        throw err;
+      }
+    },
+    enabled: !!user,
+    staleTime: 30000, // Cache for 30 seconds
+    refetchOnWindowFocus: false, // Don't refetch on window focus
+  });
 
-  const filterAndSortDuplicates = () => {
+  const duplicates = data?.duplicates || [];
+  const deletedDuplicatesCount = data?.deletedDuplicatesCount || 0;
+
+  // Memoized filtered and sorted duplicates
+  const filteredAndSortedDuplicates = useMemo(() => {
     let filtered = [...duplicates];
     
     // Apply status filter
@@ -116,10 +131,12 @@ export default function DuplicateManagement() {
       }
     });
     
-    setFilteredDuplicates(filtered);
-  };
+    return filtered;
+  }, [duplicates, statusFilter, sortBy]);
 
-  const handleDownload = async (storagePath: string, fileName: string) => {
+  const totalPages = Math.ceil(duplicates.length / itemsPerPage);
+
+  const handleDownload = useCallback(async (storagePath: string, fileName: string) => {
     try {
       const { data, error } = await supabase.storage
         .from("documents")
@@ -138,9 +155,9 @@ export default function DuplicateManagement() {
       console.error("Download error:", error);
       toast.error("Failed to download document");
     }
-  };
+  }, []);
 
-  const handleView = async (storagePath: string) => {
+  const handleView = useCallback(async (storagePath: string) => {
     try {
       const { data, error } = await supabase.storage
         .from("documents")
@@ -153,65 +170,57 @@ export default function DuplicateManagement() {
       console.error("View error:", error);
       toast.error("Failed to view document");
     }
-  };
+  }, []);
 
-  const handleMarkAsReviewed = async (duplicateId: string) => {
+  const handleMarkAsReviewed = useCallback(async (duplicateId: string) => {
     try {
       if (!user) return;
       
       await deduplicationService.updateDuplicateStatus(duplicateId, "reviewed", user.id);
       
       // Update local state
-      setDuplicates(prev => prev.map(dup => 
-        dup.id === duplicateId 
-          ? { ...dup, status: "reviewed", reviewed_at: new Date().toISOString(), reviewed_by: user.id } 
-          : dup
-      ));
+      queryClient.invalidateQueries({ queryKey: ['duplicateDocuments', user.id, currentPage, itemsPerPage] });
       
       toast.success("Marked as reviewed");
     } catch (error) {
       console.error("Error updating duplicate:", error);
       toast.error("Failed to update duplicate status");
     }
-  };
+  }, [user, queryClient, currentPage, itemsPerPage]);
 
-  const handleDismiss = async (duplicateId: string) => {
+  const handleDismiss = useCallback(async (duplicateId: string) => {
     try {
       if (!user) return;
       
       await deduplicationService.updateDuplicateStatus(duplicateId, "dismissed", user.id);
       
       // Update local state
-      setDuplicates(prev => prev.map(dup => 
-        dup.id === duplicateId ? { ...dup, status: "dismissed" } : dup
-      ));
+      queryClient.invalidateQueries({ queryKey: ['duplicateDocuments', user.id, currentPage, itemsPerPage] });
       
       toast.success("Duplicate dismissed");
     } catch (error) {
       console.error("Error dismissing duplicate:", error);
       toast.error("Failed to dismiss duplicate");
     }
-  };
+  }, [user, queryClient, currentPage, itemsPerPage]);
 
-  const handleDeleteDuplicate = async (sourceDocumentId: string, duplicateDocumentId: string) => {
+  const handleDeleteDuplicate = useCallback(async (sourceDocumentId: string, duplicateDocumentId: string) => {
     try {
       if (!user) return;
       
       await deduplicationService.deleteDuplicateDocuments(sourceDocumentId, duplicateDocumentId, user.id);
       
       // Update local state
-      setDuplicates(prev => prev.filter(dup => 
-        dup.source_document.id !== sourceDocumentId && dup.duplicate_document.id !== duplicateDocumentId
-      ));
+      queryClient.invalidateQueries({ queryKey: ['duplicateDocuments', user.id, currentPage, itemsPerPage] });
       
       toast.success("Duplicate document deleted");
     } catch (error) {
       console.error("Error deleting duplicate:", error);
       toast.error("Failed to delete duplicate document");
     }
-  };
+  }, [user, queryClient, currentPage, itemsPerPage]);
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = useCallback((status: string) => {
     switch (status) {
       case "exact":
         return <Badge className="bg-destructive hover:bg-destructive/90">Exact Match</Badge>;
@@ -224,30 +233,30 @@ export default function DuplicateManagement() {
       default:
         return <Badge className="bg-muted">{status}</Badge>;
     }
-  };
+  }, []);
 
-  const handleSelectAll = () => {
-    if (selectedDuplicates.length === filteredDuplicates.length) {
+  const handleSelectAll = useCallback(() => {
+    if (selectedDuplicates.length === filteredAndSortedDuplicates.length) {
       setSelectedDuplicates([]);
     } else {
-      setSelectedDuplicates(filteredDuplicates.map(dup => dup.id));
+      setSelectedDuplicates(filteredAndSortedDuplicates.map(dup => dup.id));
     }
-  };
+  }, [selectedDuplicates.length, filteredAndSortedDuplicates]);
 
-  const handleSelectDuplicate = (id: string) => {
+  const handleSelectDuplicate = useCallback((id: string) => {
     setSelectedDuplicates(prev => 
       prev.includes(id) 
         ? prev.filter(dupId => dupId !== id) 
         : [...prev, id]
     );
-  };
+  }, []);
 
-  const handleBulkAction = async (action: "review" | "dismiss" | "delete") => {
+  const handleBulkAction = useCallback(async (action: "review" | "dismiss" | "delete") => {
     try {
       if (!user) return;
       
       const promises = selectedDuplicates.map(id => {
-        const duplicate = filteredDuplicates.find(dup => dup.id === id);
+        const duplicate = filteredAndSortedDuplicates.find(dup => dup.id === id);
         if (!duplicate) return Promise.resolve();
         
         switch (action) {
@@ -269,87 +278,79 @@ export default function DuplicateManagement() {
       await Promise.all(promises);
       
       // Update local state
-      if (action === "delete") {
-        setDuplicates(prev => prev.filter(dup => !selectedDuplicates.includes(dup.id)));
-      } else {
-        setDuplicates(prev => prev.map(dup => {
-          if (selectedDuplicates.includes(dup.id)) {
-            return {
-              ...dup,
-              status: action === "review" ? "reviewed" : "dismissed",
-              reviewed_at: action === "review" ? new Date().toISOString() : dup.reviewed_at,
-              reviewed_by: action === "review" ? user.id : dup.reviewed_by
-            };
-          }
-          return dup;
-        }));
-      }
-      
+      queryClient.invalidateQueries({ queryKey: ['duplicateDocuments', user.id, currentPage, itemsPerPage] });
       setSelectedDuplicates([]);
-      toast.success(`Bulk ${action} completed`);
+      
+      toast.success(`Bulk action completed successfully`);
     } catch (error) {
-      console.error(`Error in bulk ${action}:`, error);
-      toast.error(`Failed to complete bulk ${action}`);
+      console.error("Error performing bulk action:", error);
+      toast.error("Failed to perform bulk action");
     }
-  };
+  }, [selectedDuplicates, filteredAndSortedDuplicates, user, queryClient, currentPage, itemsPerPage]);
 
-  if (loading) {
+  const handlePageChange = useCallback((page: number) => {
+    setCurrentPage(page);
+    setSelectedDuplicates([]);
+  }, []);
+
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading duplicate management...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="text-destructive mb-4">
+            <AlertTriangle className="h-16 w-16 mx-auto" />
+          </div>
+          <h3 className="text-lg font-medium text-foreground mb-1">Error loading duplicates</h3>
+          <p className="text-muted-foreground mb-4">
+            {error instanceof Error ? error.message : "An unknown error occurred"}
+          </p>
+          <Button onClick={() => refetch()}>Retry</Button>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Duplicate Management</h1>
-          <p className="text-muted-foreground mt-1">
-            Review and manage duplicate documents in your archive
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={fetchDuplicates}
-            disabled={loading}
-          >
-            <RotateCcw className="h-4 w-4 mr-2" />
-            Refresh
-          </Button>
-        </div>
+      <div className="pb-2 border-b border-border/50">
+        <h1 className="text-3xl font-bold text-foreground">Duplicate Management</h1>
+        <p className="text-muted-foreground mt-2">Review and manage duplicate documents in your archive</p>
       </div>
 
       {/* Filters and Controls */}
       <Card className="p-6 rounded-xl border shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium">Filters:</span>
+              <Label className="text-sm font-medium">Filter by Status</Label>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-32">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="exact">Exact Match</SelectItem>
+                  <SelectItem value="similar">Similar</SelectItem>
+                  <SelectItem value="reviewed">Reviewed</SelectItem>
+                  <SelectItem value="dismissed">Dismissed</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-32">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="exact">Exact Match</SelectItem>
-                <SelectItem value="similar">Similar</SelectItem>
-                <SelectItem value="reviewed">Reviewed</SelectItem>
-                <SelectItem value="dismissed">Dismissed</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          
-          <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">Sort by:</span>
+              <Label className="text-sm font-medium">Sort by</Label>
               <Select value={sortBy} onValueChange={setSortBy}>
                 <SelectTrigger className="w-32">
                   <SelectValue placeholder="Sort by" />
@@ -362,46 +363,16 @@ export default function DuplicateManagement() {
               </Select>
             </div>
           </div>
+          
+          <Button variant="outline" size="sm" onClick={() => refetch()}>
+            <RotateCcw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
         </div>
-        
-        {/* Bulk Actions */}
-        {selectedDuplicates.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-border flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">
-              {selectedDuplicates.length} selected
-            </span>
-            <div className="flex items-center gap-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => handleBulkAction("review")}
-              >
-                <CheckCircle className="h-4 w-4 mr-1" />
-                Mark Reviewed
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => handleBulkAction("dismiss")}
-              >
-                <XCircle className="h-4 w-4 mr-1" />
-                Dismiss
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => handleBulkAction("delete")}
-              >
-                <Trash2 className="h-4 w-4 mr-1" />
-                Delete
-              </Button>
-            </div>
-          </div>
-        )}
       </Card>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <Card className="p-5 rounded-xl border shadow-sm">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-destructive/10">
@@ -457,7 +428,56 @@ export default function DuplicateManagement() {
             </div>
           </div>
         </Card>
+        
+        <Card className="p-5 rounded-xl border shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-destructive/10">
+              <Trash2 className="h-5 w-5 text-destructive" />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Deleted Duplicates</p>
+              <p className="text-2xl font-bold text-destructive">
+                {deletedDuplicatesCount}
+              </p>
+            </div>
+          </div>
+        </Card>
       </div>
+
+      {/* Bulk Actions */}
+      {selectedDuplicates.length > 0 && (
+        <div className="mt-4 pt-4 border-t border-border flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">
+            {selectedDuplicates.length} selected
+          </span>
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => handleBulkAction("review")}
+            >
+              <CheckCircle className="h-4 w-4 mr-1" />
+              Mark Reviewed
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => handleBulkAction("dismiss")}
+            >
+              <XCircle className="h-4 w-4 mr-1" />
+              Dismiss
+            </Button>
+            <Button 
+              variant="destructive" 
+              size="sm" 
+              onClick={() => handleBulkAction("delete")}
+            >
+              <Trash2 className="h-4 w-4 mr-1" />
+              Delete
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Duplicates List */}
       <Card className="p-6 rounded-xl border shadow-sm">
@@ -468,7 +488,7 @@ export default function DuplicateManagement() {
             <div className="col-span-2 flex justify-end">Actions</div>
           </div>
           
-          {filteredDuplicates.length === 0 ? (
+          {filteredAndSortedDuplicates.length === 0 ? (
             <div className="text-center py-12">
               <AlertTriangle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-medium text-foreground mb-1">No duplicates found</h3>
@@ -478,7 +498,7 @@ export default function DuplicateManagement() {
             </div>
           ) : (
             <div className="divide-y divide-border">
-              {filteredDuplicates.map((duplicate) => (
+              {filteredAndSortedDuplicates.map((duplicate) => (
                 <div 
                   key={duplicate.id} 
                   className="grid grid-cols-12 gap-4 px-6 py-4 hover:bg-muted/30 transition-colors"
@@ -487,29 +507,16 @@ export default function DuplicateManagement() {
                   <div className="col-span-5">
                     <div className="flex items-start gap-3">
                       <div className="mt-1">
-                        <FileText className="h-5 w-5 text-muted-foreground" />
+                        <FileText className="h-5 w-5 text-primary" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-medium text-foreground truncate">
-                            {duplicate.source_document.file_name}
-                          </h4>
-                          {getStatusBadge(duplicate.status)}
-                        </div>
-                        <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
-                          <span>{(duplicate.source_document.file_size / 1024).toFixed(1)} KB</span>
-                          <span>{format(new Date(duplicate.source_document.created_at), "MMM dd, yyyy")}</span>
-                          <span className="flex items-center gap-1">
-                            <User className="h-3 w-3" />
-                            {duplicate.source_document.profiles?.full_name || "Unknown"}
+                        <p className="font-medium text-sm truncate">{duplicate.source_document.file_name}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-xs text-muted-foreground">
+                            {format(new Date(duplicate.source_document.created_at), "MMM dd, yyyy")}
                           </span>
-                        </div>
-                        <div className="flex items-center gap-2 mt-2">
                           <Badge variant="secondary" className="text-xs">
-                            {duplicate.source_document.file_type}
-                          </Badge>
-                          <Badge variant="outline" className="text-xs">
-                            {duplicate.similarity_percentage}% similar
+                            {(duplicate.source_document.file_size / 1024 / 1024).toFixed(2)} MB
                           </Badge>
                         </div>
                       </div>
@@ -520,23 +527,19 @@ export default function DuplicateManagement() {
                   <div className="col-span-5">
                     <div className="flex items-start gap-3">
                       <div className="mt-1">
-                        <FileText className="h-5 w-5 text-muted-foreground" />
+                        <FileText className="h-5 w-5 text-destructive" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-foreground truncate">
-                          {duplicate.duplicate_document.file_name}
-                        </h4>
-                        <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
-                          <span>{(duplicate.duplicate_document.file_size / 1024).toFixed(1)} KB</span>
-                          <span>{format(new Date(duplicate.duplicate_document.created_at), "MMM dd, yyyy")}</span>
-                          <span className="flex items-center gap-1">
-                            <User className="h-3 w-3" />
-                            {duplicate.duplicate_document.profiles?.full_name || "Unknown"}
+                        <p className="font-medium text-sm truncate">{duplicate.duplicate_document.file_name}</p>
+                        <div className="flex items-center gap-3 mt-1">
+                          <span className="text-xs text-muted-foreground">
+                            {format(new Date(duplicate.duplicate_document.created_at), "MMM dd, yyyy")}
                           </span>
-                        </div>
-                        <div className="flex items-center gap-2 mt-2">
                           <Badge variant="secondary" className="text-xs">
-                            {duplicate.duplicate_document.file_type}
+                            {(duplicate.duplicate_document.file_size / 1024 / 1024).toFixed(2)} MB
+                          </Badge>
+                          <Badge className="text-xs bg-destructive/10 text-destructive">
+                            {duplicate.similarity_percentage}% Match
                           </Badge>
                         </div>
                       </div>
@@ -544,18 +547,18 @@ export default function DuplicateManagement() {
                   </div>
                   
                   {/* Actions */}
-                  <div className="col-span-2 flex items-center justify-end gap-2">
+                  <div className="col-span-2 flex items-center justify-end gap-1">
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleView(duplicate.source_document.storage_path)}
+                      onClick={() => handleView(duplicate.duplicate_document.storage_path)}
                     >
                       <Eye className="h-4 w-4" />
                     </Button>
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleDownload(duplicate.source_document.storage_path, duplicate.source_document.file_name)}
+                      onClick={() => handleDownload(duplicate.duplicate_document.storage_path, duplicate.duplicate_document.file_name)}
                     >
                       <Download className="h-4 w-4" />
                     </Button>
@@ -580,6 +583,60 @@ export default function DuplicateManagement() {
             </div>
           )}
         </div>
+        
+        {/* Pagination */}
+        {duplicates.length > itemsPerPage && (
+          <div className="flex items-center justify-between mt-6">
+            <div className="text-sm text-muted-foreground">
+              Showing {Math.min((currentPage - 1) * itemsPerPage + 1, duplicates.length)} to {Math.min(currentPage * itemsPerPage, duplicates.length)} of {duplicates.length} duplicates
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+              >
+                Previous
+              </Button>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  const pageNum = i + 1;
+                  return (
+                    <Button
+                      key={pageNum}
+                      variant={currentPage === pageNum ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => handlePageChange(pageNum)}
+                    >
+                      {pageNum}
+                    </Button>
+                  );
+                })}
+                {totalPages > 5 && (
+                  <>
+                    {currentPage < totalPages - 2 && <span className="px-2">...</span>}
+                    <Button
+                      variant={currentPage === totalPages ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => handlePageChange(totalPages)}
+                    >
+                      {totalPages}
+                    </Button>
+                  </>
+                )}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
     </div>
   );

@@ -16,6 +16,7 @@ export interface Document {
   storage_path: string;
   department_id: string | null;
   created_at: string;
+  content_hash?: string | null; // Add content_hash property
 }
 
 export const documentService = {
@@ -48,18 +49,17 @@ export const documentService = {
         throw new Error("Invalid file size");
       }
       
-      // Create a unique file path - must match storage policy (user_id/filename)
-      const fileExtension = file.name.split('.').pop();
-      if (!fileExtension) {
-        throw new Error("Invalid file type");
-      }
+      // Get file extension
+      const fileExtension = file.name.split('.').pop()?.toLowerCase() || 'bin';
       
-      const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExtension}`;
-      // Fix the file path to match the storage policy: userId/filename
+      // Generate unique file path
+      const timestamp = new Date().getTime();
+      const randomSuffix = Math.random().toString(36).substring(2, 8);
+      const fileName = `${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}_${timestamp}_${randomSuffix}.${fileExtension}`;
       const filePath = `${userId}/${fileName}`;
       
-      console.log("File path generated:", filePath);
-
+      console.log("Generated file path:", filePath);
+      
       // Upload file to storage
       console.log("Uploading file to storage...");
       const { data: uploadData, error: uploadError } = await supabase.storage
@@ -98,7 +98,7 @@ export const documentService = {
         await supabase.storage.from('documents').remove([filePath]);
         throw new Error(`Failed to save document record: ${insertError.message}`);
       }
-
+      
       // Log the activity
       await logActivity({
         userId,
@@ -177,7 +177,7 @@ export const documentService = {
       }
       
       console.log("Successfully deleted file from storage");
-
+      
       // Delete from database
       const { error: dbError } = await supabase
         .from('documents')

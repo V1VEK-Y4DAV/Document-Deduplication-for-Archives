@@ -41,6 +41,7 @@ export const Sidebar = ({ isOpen }: SidebarProps) => {
     { icon: FolderOpen, label: "Archive Browser", path: "/browse" },
     { icon: Database, label: "Duplicate Management", path: "/duplicate-management" },
     { icon: Bug, label: "Test Supabase", path: "/test-supabase" },
+    { icon: Activity, label: "Test Duplicate Query", path: "/test-duplicate-query" },
     { icon: Activity, label: "Activity Test", path: "/activity-test" },
     { icon: Users, label: "User Management", path: "/admin/users", admin: true },
     { icon: BarChart3, label: "Reports & Analytics", path: "/reports" },

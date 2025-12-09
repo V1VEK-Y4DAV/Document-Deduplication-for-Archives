@@ -1,12 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { StatsCard } from "@/components/StatsCard";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { FileText, FileCheck, Files, HardDrive, Upload, Search, BarChart3, User, FileUp, FileDown, LogIn, LogOut, Copy, TrendingUp, Database, Layers, PieChart } from "lucide-react";
+import { FileText, FileCheck, Files, HardDrive, Upload, Search, BarChart3, User, FileUp, FileDown, LogIn, LogOut, Copy, TrendingUp, Database, Layers, PieChart, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell, Legend } from "recharts";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 interface Stats {
   totalDocuments: number;
@@ -16,6 +17,7 @@ interface Stats {
   storageUsed: number;
   storageTotal: number;
   storageSavedBytes: number;
+  deletedDuplicates: number;
 }
 
 interface Activity {
@@ -42,91 +44,80 @@ interface DocumentDistributionData {
 }
 
 export default function Dashboard() {
-  const [stats, setStats] = useState<Stats>({
-    totalDocuments: 0,
-    uniqueDocuments: 0,
-    duplicatesFound: 0,
-    storageSaved: "0 GB",
-    storageUsed: 0,
-    storageTotal: 100,
-    storageSavedBytes: 0,
-  });
-  const [activities, setActivities] = useState<Activity[]>([]);
-  const [monthlyDuplicates, setMonthlyDuplicates] = useState<MonthlyDuplicateData[]>([]);
-  const [documentDistribution, setDocumentDistribution] = useState<DocumentDistributionData[]>([]);
-  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
-  const fetchData = async () => {
-    try {
-      // Fetch document stats
-      const { count: totalDocs } = await supabase
-        .from("documents")
-        .select("*", { count: "exact", head: true });
+  // Fetch dashboard data with React Query
+  const { data: dashboardData, isLoading, isError, error, refetch } = useQuery({
+    queryKey: ['dashboardData'],
+    queryFn: async () => {
+      try {
+        // Fetch document stats
+        const { count: totalDocs } = await supabase
+          .from("documents")
+          .select("*", { count: "exact", head: true });
 
-      const { count: dupCount } = await supabase
-        .from("duplicates")
-        .select("*", { count: "exact", head: true });
+        const { count: dupCount } = await supabase
+          .from("duplicates")
+          .select("*", { count: "exact", head: true });
 
-      // Fetch recent activity for ALL users
-      const { data: activityData, error: activityError } = await supabase
-        .from("activity_logs")
-        .select(`
-          *,
-          profiles (full_name, email)
-        `)
-        .order("created_at", { ascending: false })
-        .limit(10);
+        // Fetch deleted duplicates count
+        const { count: deletedDupCount } = await supabase
+          .from("deleted_duplicates_memory")
+          .select("*", { count: "exact", head: true });
 
-      if (activityError) {
-        throw activityError;
+        // Fetch recent activity for ALL users (limited to 10)
+        const { data: activityData, error: activityError } = await supabase
+          .from("activity_logs")
+          .select(`
+            *,
+            profiles (full_name, email)
+          `)
+          .order("created_at", { ascending: false })
+          .limit(10);
+
+        if (activityError) {
+          throw activityError;
+        }
+
+        // Calculate storage usage
+        const storageData = await calculateStorageUsage();
+
+        // Fetch monthly duplicate trends
+        const monthlyData = await fetchMonthlyDuplicates();
+        
+        // Fetch document distribution
+        const distributionData = await fetchDocumentDistribution();
+
+        return {
+          stats: {
+            totalDocuments: totalDocs || 0,
+            uniqueDocuments: (totalDocs || 0) - (dupCount || 0),
+            duplicatesFound: dupCount || 0,
+            storageSaved: storageData.savedFormatted,
+            storageUsed: storageData.used,
+            storageTotal: storageData.total,
+            storageSavedBytes: storageData.savedBytes,
+            deletedDuplicates: deletedDupCount || 0,
+          },
+          activities: activityData || [],
+          monthlyDuplicates: monthlyData,
+          documentDistribution: distributionData
+        };
+      } catch (error: any) {
+        throw error;
       }
-
-      // Calculate storage usage
-      const storageData = await calculateStorageUsage();
-
-      // Fetch monthly duplicate trends
-      const monthlyData = await fetchMonthlyDuplicates();
-      console.log('Monthly duplicates data:', monthlyData);
-      
-      // Fetch document distribution
-      const distributionData = await fetchDocumentDistribution();
-      console.log('Document distribution data:', distributionData);
-
-      setStats({
-        totalDocuments: totalDocs || 0,
-        uniqueDocuments: (totalDocs || 0) - (dupCount || 0),
-        duplicatesFound: dupCount || 0,
-        storageSaved: storageData.savedFormatted,
-        storageUsed: storageData.used,
-        storageTotal: storageData.total,
-        storageSavedBytes: storageData.savedBytes,
-      });
-
-      setActivities(activityData || []);
-      setMonthlyDuplicates(monthlyData);
-      setDocumentDistribution(distributionData);
-    } catch (error: any) {
-      toast({
-        title: "Error loading dashboard",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, [toast]);
+    },
+    staleTime: 30000, // Cache for 30 seconds
+    refetchOnWindowFocus: false, // Don't refetch on window focus to reduce requests
+  });
 
   // Refresh dashboard data when documents are uploaded or deleted
   useEffect(() => {
     const handleDocumentChange = () => {
-      // Re-fetch data when document events occur
-      fetchData();
+      // Invalidate and refetch dashboard data
+      queryClient.invalidateQueries({ queryKey: ['dashboardData'] });
     };
 
     window.addEventListener('documentUploaded', handleDocumentChange);
@@ -136,14 +127,15 @@ export default function Dashboard() {
       window.removeEventListener('documentUploaded', handleDocumentChange);
       window.removeEventListener('documentDeleted', handleDocumentChange);
     };
-  }, []);
+  }, [queryClient]);
 
-  const calculateStorageUsage = async () => {
+  const calculateStorageUsage = useCallback(async () => {
     try {
-      // Fetch all documents to calculate total storage
+      // Fetch all documents to calculate total storage (limited to 1000 for performance)
       const { data: documents, error } = await supabase
         .from("documents")
-        .select("file_size");
+        .select("file_size")
+        .limit(1000);
 
       if (error) throw error;
 
@@ -177,9 +169,9 @@ export default function Dashboard() {
         usedPercentage: 0
       };
     }
-  };
+  }, []);
 
-  const fetchMonthlyDuplicates = async (): Promise<MonthlyDuplicateData[]> => {
+  const fetchMonthlyDuplicates = useCallback(async (): Promise<MonthlyDuplicateData[]> => {
     try {
       // Get the last 12 months
       const months = [];
@@ -194,11 +186,12 @@ export default function Dashboard() {
         });
       }
       
-      // Fetch duplicates grouped by month using Supabase date functions
+      // Fetch duplicates grouped by month using Supabase date functions (limited to last year)
       const { data: duplicates, error } = await supabase
         .from("duplicates")
         .select("created_at")
-        .gte('created_at', new Date(now.getFullYear() - 1, now.getMonth(), 1).toISOString());
+        .gte('created_at', new Date(now.getFullYear() - 1, now.getMonth(), 1).toISOString())
+        .limit(1000); // Limit to 1000 records for performance
       
       if (error) {
         console.error("Error fetching duplicates:", error);
@@ -232,14 +225,15 @@ export default function Dashboard() {
       }
       return months;
     }
-  };
+  }, []);
 
-  const fetchDocumentDistribution = async (): Promise<DocumentDistributionData[]> => {
+  const fetchDocumentDistribution = useCallback(async (): Promise<DocumentDistributionData[]> => {
     try {
-      // Fetch all documents to analyze distribution
+      // Fetch all documents to analyze distribution (limited to 1000 for performance)
       const { data: documents, error } = await supabase
         .from("documents")
-        .select("file_type");
+        .select("file_type")
+        .limit(1000);
       
       if (error) throw error;
       
@@ -301,26 +295,30 @@ export default function Dashboard() {
         { type: "TXT", count: 0, color: "#f59e0b" }
       ];
     }
-  };
+  }, []);
 
-  const handleUploadClick = () => {
+  const handleUploadClick = useCallback(() => {
     navigate("/upload");
-  };
+  }, [navigate]);
 
-  const handleQuickScanClick = () => {
+  const handleQuickScanClick = useCallback(() => {
     toast({
       title: "Quick Archive Scan",
       description: "This feature is not yet implemented. Please use the Upload page to check for duplicates.",
     });
-  };
+  }, [toast]);
+
+  // Memoized chart data
+  const memoizedMonthlyData = useMemo(() => dashboardData?.monthlyDuplicates || [], [dashboardData?.monthlyDuplicates]);
+  const memoizedDistributionData = useMemo(() => dashboardData?.documentDistribution || [], [dashboardData?.documentDistribution]);
 
   // Chart components
-  const MonthlyDuplicateTrendsChart = () => {
+  const MonthlyDuplicateTrendsChart = useCallback(() => {
     // Always render the chart, even with empty data
     return (
       <ResponsiveContainer width="100%" height="100%">
         <BarChart 
-          data={monthlyDuplicates} 
+          data={memoizedMonthlyData} 
           margin={{ top: 20, right: 20, left: 20, bottom: 30 }}
         >
           <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
@@ -359,7 +357,7 @@ export default function Dashboard() {
             radius={[4, 4, 0, 0]}
             barSize={18}
           >
-            {monthlyDuplicates.map((entry, index) => (
+            {memoizedMonthlyData.map((entry, index) => (
               <Cell 
                 key={`cell-${index}`} 
                 fill={entry.duplicates > 0 ? '#f59e0b' : '#94a3b8'} 
@@ -369,9 +367,9 @@ export default function Dashboard() {
         </BarChart>
       </ResponsiveContainer>
     );
-  };
+  }, [memoizedMonthlyData]);
 
-  const DocumentDistributionChart = () => {
+  const DocumentDistributionChart = useCallback(() => {
     // Always render the chart, even with empty data
     return (
       <div className="flex flex-col md:flex-row items-center justify-between h-full gap-6">
@@ -379,7 +377,7 @@ export default function Dashboard() {
           <ResponsiveContainer width="100%" height="100%">
             <RechartsPieChart>
               <Pie
-                data={documentDistribution}
+                data={memoizedDistributionData}
                 cx="50%"
                 cy="50%"
                 innerRadius={45}
@@ -394,7 +392,7 @@ export default function Dashboard() {
                 startAngle={330}
                 endAngle={690}
               >
-                {documentDistribution.map((entry, index) => (
+                {memoizedDistributionData.map((entry, index) => (
                   <Cell 
                     key={`cell-${index}`} 
                     fill={entry.count > 0 ? entry.color : '#94a3b8'} 
@@ -422,7 +420,7 @@ export default function Dashboard() {
                 dominantBaseline="middle"
                 className="text-xl font-bold fill-foreground"
               >
-                {documentDistribution.reduce((sum, item) => sum + item.count, 0)}
+                {memoizedDistributionData.reduce((sum, item) => sum + item.count, 0)}
                 <tspan x="50%" dy="1.4em" className="text-xs font-normal fill-muted-foreground">Total Files</tspan>
               </text>
             </RechartsPieChart>
@@ -430,7 +428,7 @@ export default function Dashboard() {
         </div>
         <div className="w-full md:w-5/12 h-full max-h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-rounded-full scrollbar-track-transparent scrollbar-thumb-muted-foreground/20">
           <div className="space-y-2.5 pr-2">
-            {documentDistribution.map((entry, index) => (
+            {memoizedDistributionData.map((entry, index) => (
               <div key={`legend-${index}`} className="flex items-center justify-between p-3 rounded-lg bg-accent/30 hover:bg-accent/50 transition-all duration-200 border border-border/50">
                 <div className="flex items-center">
                   <div 
@@ -442,7 +440,7 @@ export default function Dashboard() {
                 <span className="text-foreground text-sm font-semibold min-w-fit">{entry.count}</span>
               </div>
             ))}
-            {documentDistribution.length === 0 && (
+            {memoizedDistributionData.length === 0 && (
               <div className="text-center text-muted-foreground py-6">
                 <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
                 <p className="text-sm">No documents found</p>
@@ -453,14 +451,31 @@ export default function Dashboard() {
         </div>
       </div>
     );
-  };
+  }, [memoizedDistributionData]);
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-muted-foreground">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="text-destructive mb-4">
+            <FileText className="h-16 w-16 mx-auto" />
+          </div>
+          <h3 className="text-lg font-medium text-foreground mb-1">Error loading dashboard</h3>
+          <p className="text-muted-foreground mb-4">
+            {error instanceof Error ? error.message : "An unknown error occurred"}
+          </p>
+          <Button onClick={() => refetch()}>Retry</Button>
         </div>
       </div>
     );
@@ -475,26 +490,37 @@ export default function Dashboard() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
         <StatsCard
           title="Total Documents"
-          value={stats.totalDocuments}
+          value={dashboardData?.stats.totalDocuments || 0}
           icon={FileText}
           variant="blue"
         />
         <StatsCard
           title="Unique Documents"
-          value={stats.uniqueDocuments}
+          value={dashboardData?.stats.uniqueDocuments || 0}
           icon={FileCheck}
           variant="green"
         />
         <StatsCard
           title="Duplicates Found"
-          value={stats.duplicatesFound}
+          value={dashboardData?.stats.duplicatesFound || 0}
           icon={Files}
           variant="red"
         />
-        <StatsCard title="Storage Saved" value={stats.storageSaved} icon={HardDrive} variant="amber" />
+        <StatsCard 
+          title="Storage Saved" 
+          value={dashboardData?.stats.storageSaved || "0 GB"} 
+          icon={HardDrive} 
+          variant="amber" 
+        />
+        <StatsCard
+          title="Deleted Duplicates"
+          value={dashboardData?.stats.deletedDuplicates || 0}
+          icon={Trash2}
+          variant="destructive"
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -551,22 +577,22 @@ export default function Dashboard() {
                 <div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Used</span>
-                    <span className="font-medium">{stats.storageUsed.toFixed(1)} GB / {stats.storageTotal} GB</span>
+                    <span className="font-medium">{(dashboardData?.stats.storageUsed || 0).toFixed(1)} GB / {dashboardData?.stats.storageTotal || 100} GB</span>
                   </div>
                   <div className="w-full bg-secondary rounded-full h-3 mt-2">
                     <div 
                       className="bg-primary h-3 rounded-full transition-all duration-500 ease-out" 
-                      style={{ width: `${Math.min(100, Math.round((stats.storageUsed / stats.storageTotal) * 100))}%` }}
+                      style={{ width: `${Math.min(100, Math.round(((dashboardData?.stats.storageUsed || 0) / (dashboardData?.stats.storageTotal || 100)) * 100))}%` }}
                     ></div>
                   </div>
                   <div className="flex justify-between text-xs text-muted-foreground mt-1">
                     <span>0 GB</span>
-                    <span>{stats.storageTotal} GB</span>
+                    <span>{dashboardData?.stats.storageTotal || 100} GB</span>
                   </div>
                 </div>
                 <div className="pt-4 border-t border-border">
                   <p className="text-sm">
-                    <span className="font-medium text-success">{stats.storageSaved}</span> saved through deduplication
+                    <span className="font-medium text-success">{dashboardData?.stats.storageSaved || "0 GB"}</span> saved through deduplication
                   </p>
                 </div>
               </div>

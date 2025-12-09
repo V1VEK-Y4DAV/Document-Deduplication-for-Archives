@@ -5,7 +5,7 @@ interface StatsCardProps {
   title: string;
   value: string | number;
   icon: LucideIcon;
-  variant: "blue" | "green" | "red" | "amber";
+  variant: "blue" | "green" | "red" | "amber" | "destructive";
 }
 
 const variantStyles = {
@@ -13,6 +13,7 @@ const variantStyles = {
   green: "bg-stat-green text-success",
   red: "bg-stat-red text-destructive",
   amber: "bg-stat-amber text-warning",
+  destructive: "bg-destructive/10 text-destructive", // Add destructive variant
 };
 
 export const StatsCard = ({ title, value, icon: Icon, variant }: StatsCardProps) => {
