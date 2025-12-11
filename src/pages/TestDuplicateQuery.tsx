@@ -17,7 +17,8 @@ const TestDuplicateQuery = () => {
       try {
         console.log("Testing query for user:", user.id);
         
-        const { data, error } = await supabase
+        // Fetch duplicates where the source document belongs to the user
+        const { data: sourceData, error: sourceError } = await supabase
           .from('duplicates')
           .select(`
             *,
@@ -40,17 +41,51 @@ const TestDuplicateQuery = () => {
               profiles:user_id (full_name)
             )
           `)
-          .or(`source_document.user_id.eq.${user.id},duplicate_document.user_id.eq.${user.id}`)
+          .eq('source_document.user_id', user.id)
           .order('created_at', { ascending: false })
           .range(0, 49);
 
-        console.log("Query result:", { data, error });
+        if (sourceError) throw sourceError;
+
+        // Fetch duplicates where the duplicate document belongs to the user
+        const { data: duplicateData, error: duplicateError } = await supabase
+          .from('duplicates')
+          .select(`
+            *,
+            source_document:documents!duplicates_source_document_id_fkey (
+              id,
+              file_name,
+              file_size,
+              created_at,
+              file_type,
+              storage_path,
+              profiles:user_id (full_name)
+            ),
+            duplicate_document:documents!duplicates_duplicate_document_id_fkey (
+              id,
+              file_name,
+              file_size,
+              created_at,
+              file_type,
+              storage_path,
+              profiles:user_id (full_name)
+            )
+          `)
+          .eq('duplicate_document.user_id', user.id)
+          .order('created_at', { ascending: false })
+          .range(0, 49);
+
+        if (duplicateError) throw duplicateError;
+
+        // Combine and deduplicate results
+        const combinedData = [...(sourceData || []), ...(duplicateData || [])];
+        const uniqueData = combinedData.filter((item, index, self) => 
+          index === self.findIndex(t => t.id === item.id)
+        );
+
+        console.log("Query result:", { sourceData, sourceError, duplicateData, duplicateError });
         
-        if (error) {
-          setError(error);
-        } else {
-          setResult(data);
-        }
+        setResult(uniqueData);
       } catch (err) {
         console.error("Caught error:", err);
         setError(err);

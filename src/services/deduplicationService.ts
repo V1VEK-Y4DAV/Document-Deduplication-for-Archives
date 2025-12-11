@@ -486,7 +486,7 @@ export const deduplicationService = {
           .from("deleted_duplicates_memory")
           .select("id")
           .eq("user_id", userId)
-          .or(`and(source_content_hash.eq.${sourceHash},duplicate_content_hash.eq.${duplicateHash}),and(source_content_hash.eq.${duplicateHash},duplicate_content_hash.eq.${sourceHash})`)
+          .or(`and(source_content_hash.eq."${sourceHash}",duplicate_content_hash.eq."${duplicateHash}"),and(source_content_hash.eq."${duplicateHash}",duplicate_content_hash.eq."${sourceHash}")`)
           .limit(1);
         
         if (error) throw error;
@@ -498,3 +498,5 @@ export const deduplicationService = {
     });
   }
 };
+
+
