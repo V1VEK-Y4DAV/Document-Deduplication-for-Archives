@@ -26,14 +26,24 @@ export const deduplicationService = {
    */
   generateContentHash: async function(file: File): Promise<string> {
     return performanceMonitor.track("generateContentHash", async () => {
-      // For demo purposes, we'll use the file content to generate a hash
-      // In a real implementation, you would extract the actual text content
-      const arrayBuffer = await file.arrayBuffer();
-      const hash = md5(new Uint8Array(arrayBuffer).toString());
-      return hash.toString();
+      try {
+        // For demo purposes, we'll use the file content to generate a hash
+        // In a real implementation, you would extract the actual text content
+        const arrayBuffer = await file.arrayBuffer();
+        const uint8Array = new Uint8Array(arrayBuffer);
+        // Convert to hex string for consistent hashing
+        let hexString = '';
+        for (let i = 0; i < uint8Array.length; i++) {
+          hexString += uint8Array[i].toString(16).padStart(2, '0');
+        }
+        const hash = md5(hexString);
+        return hash.toString();
+      } catch (error) {
+        console.error("Error generating content hash:", error);
+        throw error;
+      }
     });
   },
-
   /**
    * Check for duplicates of an uploaded document
    */
@@ -47,19 +57,22 @@ export const deduplicationService = {
         // Generate content hash for exact duplicate detection
         const contentHash = await this.generateContentHash(file);
         
+        // Add a small delay to ensure database consistency
+        await new Promise(resolve => setTimeout(resolve, 100));        
         // Get all user documents except the current one with pagination
+        // Only check documents that have content_hash populated
         const { data: allDocuments, error: allDocsError } = await supabase
           .from("documents")
           .select("id, file_name, file_size, created_at, content_hash")
           .eq("user_id", userId)
           .neq("id", documentId)
+          .not("content_hash", "is", null)
           .limit(100); // Limit to 100 documents to prevent performance issues
         
         if (allDocsError) {
           console.error("Error fetching documents for similarity check:", allDocsError);
           throw allDocsError;
-        }
-        
+        }        
         // Get deleted duplicate pairs for this user with pagination
         const { data: deletedPairs, error: deletedPairsError } = await supabase
           .from("deleted_duplicates_memory")
@@ -77,17 +90,18 @@ export const deduplicationService = {
         if (deletedPairs) {
           deletedPairs.forEach(pair => {
             // Add both directions since order doesn't matter
-            deletedHashPairs.add(`${pair.source_content_hash}-${pair.duplicate_content_hash}`);
-            deletedHashPairs.add(`${pair.duplicate_content_hash}-${pair.source_content_hash}`);
+            deletedHashPairs.add(`${pair.source_content_hash}|${pair.duplicate_content_hash}`);
+            deletedHashPairs.add(`${pair.duplicate_content_hash}|${pair.source_content_hash}`);
           });
-        }
-        
+        }        
         // Filter out documents that have been previously deleted as duplicates
         const documentsToCheck = (allDocuments || []).filter(doc => {
-          if (!doc.content_hash) return true;
+          if (!doc.content_hash) return false;
           
-          // Check if this pair has been previously deleted
-          const isDeleted = deletedHashPairs.has(`${contentHash}-${doc.content_hash}`);
+          // Check if this pair has been previously deleted (both directions)
+          const pairKey1 = `${contentHash}|${doc.content_hash}`;
+          const pairKey2 = `${doc.content_hash}|${contentHash}`;
+          const isDeleted = deletedHashPairs.has(pairKey1) || deletedHashPairs.has(pairKey2);
           return !isDeleted;
         });
         
@@ -177,7 +191,7 @@ export const deduplicationService = {
     documentId: string,
     userId: string,
     file: File
-  ): Promise<void> {
+  ): Promise<string> {
     return performanceMonitor.track("updateDocumentHash", async () => {
       try {
         const contentHash = await this.generateContentHash(file);
@@ -193,6 +207,21 @@ export const deduplicationService = {
           throw error;
         }
         
+        // Verify the update was successful by re-fetching the document
+        const { data: updatedDoc, error: fetchError } = await supabase
+          .from("documents")
+          .select("content_hash")
+          .eq("id", documentId)
+          .eq("user_id", userId)
+          .single();
+          
+        if (fetchError) {
+          console.error("Error fetching updated document:", fetchError);
+          throw fetchError;
+        }
+        
+        // Return the content hash to ensure consistency
+        return updatedDoc.content_hash;        
         // Log the hash update activity
         await logActivity({
           userId,
@@ -498,5 +527,7 @@ export const deduplicationService = {
     });
   }
 };
+
+
 
 

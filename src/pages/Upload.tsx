@@ -101,20 +101,19 @@ export default function Upload() {
         });
         
         if (uploadResult.success && uploadResult.document) {
-          // Update document with content hash
-          await deduplicationService.updateDocumentHash(
+          // Update document with content hash and get the confirmed hash
+          const contentHash = await deduplicationService.updateDocumentHash(
             uploadResult.document.id,
             user.id,
             file
           );
           
-          // Check for duplicates
+          // Check for duplicates using the confirmed content hash
           const duplicates = await deduplicationService.checkForDuplicates(
             user.id,
             file,
             uploadResult.document.id
-          );
-          
+          );          
           results.push({
             file,
             document: uploadResult.document,
