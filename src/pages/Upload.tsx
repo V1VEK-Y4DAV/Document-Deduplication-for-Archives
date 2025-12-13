@@ -1,7 +1,7 @@
 import { useState, useRef, ChangeEvent, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Upload as UploadIcon, FileText, Calendar, AlertCircle, CheckCircle, X, Eye, Trash2 } from "lucide-react";
+import { Upload as UploadIcon, FileText, Calendar, AlertCircle, CheckCircle, X, Eye, Trash2, Download } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
 import { documentService, Document } from "@/services/documentService";
@@ -174,6 +174,27 @@ export default function Upload() {
     } catch (error) {
       console.error("View error:", error);
       toast.error("Failed to view document");
+    }
+  };
+
+  const handleDownloadDocument = async (storagePath: string, fileName: string) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from("documents")
+        .download(storagePath);
+      
+      if (error) throw error;
+      
+      const url = URL.createObjectURL(data);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Download started");
+    } catch (error) {
+      console.error("Download error:", error);
+      toast.error("Failed to download document");
     }
   };
 
@@ -399,6 +420,14 @@ export default function Upload() {
                     >
                       <Eye className="h-4 w-4 mr-1" />
                       View
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => handleDownloadDocument(pf.document.storage_path, pf.file.name)}
+                    >
+                      <Download className="h-4 w-4 mr-1" />
+                      Download
                     </Button>
                     <Button 
                       variant="destructive" 
