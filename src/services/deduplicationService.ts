@@ -57,8 +57,9 @@ export const deduplicationService = {
         // Generate content hash for exact duplicate detection
         const contentHash = await this.generateContentHash(file);
         
-        // Add a small delay to ensure database consistency
-        await new Promise(resolve => setTimeout(resolve, 100));        
+        // Add a longer delay to ensure database consistency
+        await new Promise(resolve => setTimeout(resolve, 300));        
+        
         // Get all user documents except the current one with pagination
         // Only check documents that have content_hash populated
         const { data: allDocuments, error: allDocsError } = await supabase
@@ -67,18 +68,19 @@ export const deduplicationService = {
           .eq("user_id", userId)
           .neq("id", documentId)
           .not("content_hash", "is", null)
-          .limit(100); // Limit to 100 documents to prevent performance issues
+          .limit(200); // Increase limit to 200 documents for better detection
         
         if (allDocsError) {
           console.error("Error fetching documents for similarity check:", allDocsError);
           throw allDocsError;
         }        
+        
         // Get deleted duplicate pairs for this user with pagination
         const { data: deletedPairs, error: deletedPairsError } = await supabase
           .from("deleted_duplicates_memory")
           .select("source_content_hash, duplicate_content_hash")
           .eq("user_id", userId)
-          .limit(1000); // Limit to 1000 deleted pairs
+          .limit(2000); // Increase limit to 2000 deleted pairs
         
         if (deletedPairsError) {
           console.error("Error fetching deleted duplicates memory:", deletedPairsError);
@@ -94,6 +96,7 @@ export const deduplicationService = {
             deletedHashPairs.add(`${pair.duplicate_content_hash}|${pair.source_content_hash}`);
           });
         }        
+        
         // Filter out documents that have been previously deleted as duplicates
         const documentsToCheck = (allDocuments || []).filter(doc => {
           if (!doc.content_hash) return false;
@@ -134,7 +137,7 @@ export const deduplicationService = {
           };
         }).filter(doc => doc.similarity_score >= 70) // Only show documents with 70%+ similarity
           .sort((a, b) => b.similarity_score - a.similarity_score) // Sort by similarity
-          .slice(0, 5); // Limit to top 5 similar documents
+          .slice(0, 10); // Increase limit to top 10 similar documents
 
         // Log the duplicate detection activity
         await logActivity({
@@ -207,6 +210,9 @@ export const deduplicationService = {
           throw error;
         }
         
+        // Add longer delay to ensure database consistency
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
         // Verify the update was successful by re-fetching the document
         const { data: updatedDoc, error: fetchError } = await supabase
           .from("documents")
@@ -222,6 +228,7 @@ export const deduplicationService = {
         
         // Return the content hash to ensure consistency
         return updatedDoc.content_hash;        
+        
         // Log the hash update activity
         await logActivity({
           userId,
@@ -527,6 +534,8 @@ export const deduplicationService = {
     });
   }
 };
+
+
 
 
 
