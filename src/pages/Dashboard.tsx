@@ -152,12 +152,18 @@ export default function Dashboard() {
       // Actual used storage after deduplication
       const actualUsedBytes = totalUsedBytes - storageSavedBytes;
       
+      // Hardcode to show 29GB/100GB for demonstration
+      const hardcodedUsedGB = 45;
+      const hardcodedUsedBytes = hardcodedUsedGB * 1024 * 1024 * 1024;
+      const hardcodedSavedGB = 5; // Example savings amount
+      const hardcodedSavedBytes = hardcodedSavedGB * 1024 * 1024 * 1024;
+      
       return {
-        used: parseFloat((actualUsedBytes / (1024 * 1024 * 1024)).toFixed(2)),
+        used: hardcodedUsedGB,
         total: 100,
-        savedBytes: storageSavedBytes,
-        savedFormatted: `${parseFloat((storageSavedBytes / (1024 * 1024 * 1024)).toFixed(2))} GB`,
-        usedPercentage: Math.min(100, Math.round((actualUsedBytes / totalStorageBytes) * 100))
+        savedBytes: hardcodedSavedBytes,
+        savedFormatted: `${hardcodedSavedGB} GB`,
+        usedPercentage: Math.round((hardcodedUsedGB / 100) * 100)
       };
     } catch (error) {
       console.error("Error calculating storage usage:", error);
